@@ -3,6 +3,23 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.0.1
+
+- **Toutes les sessions en équipage sont partagées** (essais, qualif, course), plus seulement les
+  courses : chacun retrouve ses propres tours. Une qualif où un coéquipier a fait le chrono ne
+  vous attribue plus son temps.
+- Quand les pilotes d'un équipage n'ont pas vu la même chose (l'un a rejoint la session plus tard),
+  la version du pilote dont les journaux LMU commencent le plus tôt l'emporte : un pilote arrivé en
+  cours de course ne se voit plus attribuer les tours de son coéquipier.
+- **Trois modes de session** : *hors ligne*, *en ligne* (seul dans la voiture) et *équipage* (en
+  ligne, voiture partagée). Un repère sur chaque ligne de l'historique et dans l'analyse, et un
+  filtre **Mode** dans l'historique.
+- Deux pilotes sur la même séance d'essais en ligne sont reconnus ensemble (même fin de séance),
+  même quand LMU ne dit pas clairement quand la séance a commencé.
+- **Courbe d'écarts** : survoler le nom d'une équipe à droite met sa courbe en évidence, un clic la
+  garde (● ; nouveau clic pour relâcher). Notre voiture reste à demi visible pour comparer.
+- Toutes les sessions sont relues au premier démarrage.
+
 ## 4.0.0
 
 Version de nettoyage : chaque écran a été repris pour être plus clair, plus visuel et sans texte

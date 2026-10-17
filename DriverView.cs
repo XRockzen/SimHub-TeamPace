@@ -87,6 +87,15 @@ namespace User.TeamPace
     {
         private static readonly TimeSpan Tolerance = TimeSpan.FromMinutes(3);
 
+        /// <summary>When LMU wrote the results file ("2026_10_17_13_58_35-74P1").</summary>
+        private static bool FileEnd(string fileId, out DateTime end)
+        {
+            end = DateTime.MinValue;
+            return fileId != null && fileId.Length >= 19 &&
+                   DateTime.TryParseExact(fileId.Substring(0, 19), "yyyy_MM_dd_HH_mm_ss", System.Globalization.CultureInfo.InvariantCulture,
+                                          System.Globalization.DateTimeStyles.None, out end);
+        }
+
         /// <summary>Two drivers' results describe the same event (same server session).</summary>
         public static bool Same(LmuSessionRecord a, LmuSessionRecord b)
         {
@@ -94,6 +103,11 @@ namespace User.TeamPace
             if (!string.Equals(a.TrackDisplayName, b.TrackDisplayName, StringComparison.OrdinalIgnoreCase)) return false;
             if (a.IsRace != b.IsRace || a.IsQuali != b.IsQuali) return false;
             if (a.IsRace && TeamRaceStore.SameRace(a, b)) return true;
+            // Both results files written at the end of the same session (a joined practice does
+            // not always tell when the session started, its end is the same for everyone)
+            DateTime ea, eb;
+            if (FileEnd(a.FileId, out ea) && FileEnd(b.FileId, out eb) && (ea - eb).Duration() <= TimeSpan.FromMinutes(2) &&
+                (a.SessionDate - b.SessionDate).Duration() <= TimeSpan.FromMinutes(30)) return true;
             DateTime ta, tb;
             if (a.BlockStartUtc != DateTime.MinValue && b.BlockStartUtc != DateTime.MinValue)
             {

@@ -371,9 +371,17 @@ namespace User.TeamPace
                 AttachStreamEvents(stream, driverName, laps);
 
             // ── Race: the whole car, shared with the crew ──────────────────────
-            if (session.IsRace && allLaps.Count > 0)
+            // Every session the car was shared in (practice, qualifying, race), and every race
+            if ((session.IsRace || !string.IsNullOrEmpty(session.TeamDrivers)) && allLaps.Count > 0)
             {
-                try { session.Race = BuildTeamRace(session, allLaps, owners, driverName, stream); }
+                try
+                {
+                    session.Race = BuildTeamRace(session, allLaps, owners, driverName, stream);
+                    // How early this player's logs start: the earliest knows who drove each lap best
+                    double from = double.MaxValue;
+                    foreach (var st in streams ?? new List<XElement> { stream }) if (st != null) from = Math.Min(from, FirstEventTime(st));
+                    session.Race.LogFrom = from == double.MaxValue ? 0 : from;
+                }
                 catch (Exception ex) { SimHub.Logging.Current.Warn("[LmuXml] Team race: " + ex.Message); }
             }
 

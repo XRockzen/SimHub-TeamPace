@@ -508,8 +508,41 @@ namespace User.TeamPace
             };
             private readonly List<CarRun> _cars;
             private readonly CarRun _leader, _us;
+            // A car brought forward: hovered on its name, or pinned by a click (kept while the chart is rebuilt)
+            private static string _pinned;
+            private string _hover;
+            private readonly List<KeyValuePair<Rect, string>> _labelHits = new List<KeyValuePair<Rect, string>>();
 
-            public GapChart(List<CarRun> cars, CarRun leader, CarRun us) { _cars = cars; _leader = leader; _us = us; }
+            public GapChart(List<CarRun> cars, CarRun leader, CarRun us)
+            {
+                _cars = cars; _leader = leader; _us = us;
+                ToolTip = null;
+            }
+
+            private string LabelAt(Point p)
+            {
+                foreach (var kv in _labelHits) if (kv.Key.Contains(p)) return kv.Value;
+                return null;
+            }
+
+            protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
+            {
+                var hit = LabelAt(e.GetPosition(this));
+                Cursor = hit != null ? Cursors.Hand : null;
+                if (hit != _hover) { _hover = hit; InvalidateVisual(); }
+            }
+
+            protected override void OnMouseLeave(System.Windows.Input.MouseEventArgs e)
+            {
+                if (_hover != null) { _hover = null; InvalidateVisual(); }
+            }
+
+            protected override void OnMouseLeftButtonDown(System.Windows.Input.MouseButtonEventArgs e)
+            {
+                var hit = LabelAt(e.GetPosition(this));
+                _pinned = hit == null || hit == _pinned ? null : hit;
+                InvalidateVisual();
+            }
 
             protected override void OnRender(DrawingContext dc)
             {
@@ -555,14 +588,24 @@ namespace User.TeamPace
                     dc.DrawText(ft, new Point(X(l) - ft.Width / 2, top + h + 5));
                 }
 
-                // Legend on the right, at each line's end, nudged apart
-                var labels = new List<Tuple<double, string, Brush>>();
+                // Legend on the right, at each line's end, nudged apart. The car brought forward
+                // (hovered or pinned) is drawn last and thick, the others fade.
+                string focus = _hover ?? _pinned;
+                if (focus != null && !series.Exists(x => x.Key.Label == focus)) focus = null;
+                var labels = new List<Tuple<double, string, Brush, string>>();
+                var colors = new Dictionary<CarRun, Brush>();
                 int k = 0;
-                foreach (var s in series)
+                foreach (var s in series) colors[s.Key] = s.Key == _us ? Ui.Amber : Colors[k++ % Colors.Length];
+                var ordered = new List<KeyValuePair<CarRun, List<Point>>>(series);
+                ordered.Sort((a, b) => (a.Key.Label == focus).CompareTo(b.Key.Label == focus));
+                foreach (var s in ordered)
                 {
                     if (s.Value.Count < 2) continue;
-                    Brush color = s.Key == _us ? Ui.Amber : Colors[k++ % Colors.Length];
-                    var pen = new Pen(color, s.Key == _us ? 2.6 : 1.5);
+                    var baseColor = ((SolidColorBrush)colors[s.Key]).Color;
+                    bool on = focus == null || s.Key.Label == focus;
+                    // Our car stays half visible, to compare with the one brought forward
+                    Brush color = on ? colors[s.Key] : Ui.Frozen(Color.FromArgb((byte)(s.Key == _us ? 150 : 55), baseColor.R, baseColor.G, baseColor.B));
+                    var pen = new Pen(color, focus != null && on ? 3.2 : s.Key == _us ? 2.6 : 1.5);
                     pen.Freeze();
                     var geo = new StreamGeometry();
                     using (var ctx = geo.Open())
@@ -574,16 +617,21 @@ namespace User.TeamPace
                     dc.DrawGeometry(null, pen, geo);
                     var last = s.Value[s.Value.Count - 1];
                     string name = s.Key.Label.Length > 22 ? s.Key.Label.Substring(0, 21) + "…" : s.Key.Label;
-                    labels.Add(Tuple.Create(Y(last.Y), "P" + s.Key.ClassPosition + " " + name, color));
+                    labels.Add(Tuple.Create(Y(last.Y), "P" + s.Key.ClassPosition + " " + name, on ? colors[s.Key] : Ui.Faint, s.Key.Label));
                 }
                 labels.Sort((a, b) => a.Item1.CompareTo(b.Item1));
                 double prev = double.MinValue;
+                _labelHits.Clear();
                 foreach (var l in labels)
                 {
                     double y = Math.Max(l.Item1, prev + 15);
                     prev = y;
-                    var ft = new FormattedText(l.Item2, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, tf, 11.5, l.Item3, 1.0);
-                    dc.DrawText(ft, new Point(left + w + 8, y - ft.Height / 2));
+                    bool focused = l.Item4 == focus;
+                    var ft = new FormattedText((focused && l.Item4 == _pinned ? "● " : "") + l.Item2, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                                               new Typeface(tf.FontFamily, FontStyles.Normal, focused ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal), 11.5, l.Item3, 1.0);
+                    var at = new Point(left + w + 8, y - ft.Height / 2);
+                    dc.DrawText(ft, at);
+                    _labelHits.Add(new KeyValuePair<Rect, string>(new Rect(at.X - 2, at.Y, ft.Width + 4, ft.Height), l.Item4));
                 }
             }
         }

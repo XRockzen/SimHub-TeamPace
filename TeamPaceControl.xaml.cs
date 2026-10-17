@@ -856,7 +856,7 @@ namespace User.TeamPace
                     return "Une ligne par circuit et catégorie : le record de chaque pilote ; le plus rapide en vert (★), l'écart des autres en rouge. Les étiquettes de catégorie filtrent le tableau.\n" +
                            "Clic : le circuit ressort dans l'activité. Double-clic : la page du circuit (progression, télémétrie, plan de travail).";
                 case Screen.History:
-                    return "Une ligne par session, groupées par jour. Une session courue par plusieurs pilotes n'occupe qu'une ligne, avec le résultat de chacun ; ÉQUIPAGE marque une course en équipe.\n" +
+                    return "Une ligne par session, groupées par jour. Une session courue par plusieurs pilotes n'occupe qu'une ligne, avec le résultat de chacun. Mode : hors ligne, en ligne (seul dans la voiture) ou équipage (voiture partagée).\n" +
                            "Double-clic : l'analyse de la session. Les sessions sans tour chronométré sont masquées.";
                 case Screen.Strategy:
                     return "Préparation : l'énergie d'abord, le plein à chaque arrêt et le complément au dernier. Glissez un arrêt (carré jaune) pour le déplacer ; glissez un pilote sur un relais, ou cliquez le relais. Chaque arrêt se règle sur sa carte : le niveau d'énergie voulu à la sortie des stands et les pneus.\n" +
@@ -864,7 +864,7 @@ namespace User.TeamPace
                 case Screen.Analysis:
                     if (_state.RaceTab)
                         return "Prévu / réel : le plan de l'équipe pour ce circuit face à la course ; un arrêt réel est aussi large que le temps qu'il a coûté. Les arrêts des autres voitures sont repérés au temps perdu (40 s ou plus) : LMU n'écrit ni leur énergie ni leurs pneus.\n" +
-                               "Toutes les voitures : clic sur une ligne pour en faire la référence de « Où le temps est parti » ; les cases choisissent les voitures de la courbe d'écarts (plus bas = plus loin du premier).";
+                               "Toutes les voitures : clic sur une ligne pour en faire la référence de « Où le temps est parti » ; les cases choisissent les voitures de la courbe d'écarts (plus bas = plus loin du premier) ; survol ou clic sur un nom à droite : sa courbe en évidence.";
                     return "Cochez ou décochez des tours : les statistiques se recalculent. « Rythme » coche les tours représentatifs. ▾ replie les statistiques ou le tableau.\n" +
                            "Double-clic sur un tour : sa télémétrie. Au survol du théorique, des invalides et des arrêts : le détail. Repères et couleurs ci-dessous.";
                 default:

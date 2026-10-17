@@ -59,6 +59,11 @@ namespace User.TeamPace
         public bool IsRace     { get { return SessionType != null && SessionType.StartsWith("R"); } }
         public bool IsQuali    { get { return SessionType != null && SessionType.StartsWith("Q"); } }
         public bool IsPractice { get { return !IsRace && !IsQuali; } }
+        public bool IsOnline   { get { return string.Equals(Setting, "Multiplayer", StringComparison.OrdinalIgnoreCase); } }
+        public bool IsCrew     { get { return !string.IsNullOrEmpty(TeamDrivers); } }
+        /// <summary>"Hors ligne", "En ligne" or "Équipage" (online, the car shared with teammates).</summary>
+        public string Mode     { get { return IsCrew ? "Équipage" : IsOnline ? "En ligne" : "Hors ligne"; } }
+        public string ModeBg   { get { return IsCrew ? "#FF5E4B8B" : IsOnline ? "#FF1F6FB5" : "#FF55585F"; } }
         public bool IsFullSim  { get { return DamageMult >= 1.0f && FuelMult >= 1.0f && TireMult >= 1.0f; } }
         public bool IsFinished { get { return string.Equals(FinishStatus, "Finished Normally", StringComparison.OrdinalIgnoreCase); } }
         public int  PositionsGained { get { return GridPos > 0 && Position > 0 ? GridPos - Position : 0; } }

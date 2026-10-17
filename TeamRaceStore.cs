@@ -19,6 +19,7 @@ namespace User.TeamPace
         public List<LmuLapRecord> Laps = new List<LmuLapRecord>(); // every lap of the car
         public List<string> Owners = new List<string>();           // who drove each of them
         public RaceField Field;
+        public double LogFrom = double.MaxValue;   // session time the writer's logs start from (earlier = better informed)
         public string Author;
         public DateTime UpdatedUtc;
 
@@ -62,8 +63,8 @@ namespace User.TeamPace
             race.Author = LmuSessionStore.PlayerName;
             race.UpdatedUtc = DateTime.UtcNow;
             var s = race.Session;
-            var name = string.Format("{0:yyyyMMdd_HHmm}_{1}_{2}_{3}.json", s.BlockStartUtc,
-                LmuTeamSync.Sanitize(Short(s.TrackVenue, 16)), s.CarNumber, LmuTeamSync.Sanitize(Short(LmuSessionStore.PlayerName, 16)));
+            var name = string.Format("{0:yyyyMMdd_HHmm}_{4}_{1}_{2}_{3}.json", s.BlockStartUtc,
+                LmuTeamSync.Sanitize(Short(s.TrackVenue, 16)), s.CarNumber, LmuTeamSync.Sanitize(Short(LmuSessionStore.PlayerName, 16)), s.SessionType);
             string json;
             try { json = Newtonsoft.Json.JsonConvert.SerializeObject(race); }
             catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Team race: " + ex.Message); return; }
@@ -109,9 +110,10 @@ namespace User.TeamPace
                         TeamRace r = null;
                         try { r = Newtonsoft.Json.JsonConvert.DeserializeObject<TeamRace>(File.ReadAllText(f)); } catch { }
                         if (r == null || r.Session == null || r.Laps.Count != r.Owners.Count) continue;
+                        // One per session: the writer whose logs start earliest knew who drove each lap
                         var same = list.FindIndex(x => SameRace(x.Session, r.Session));
                         if (same < 0) list.Add(r);
-                        else if (r.Laps.Count > list[same].Laps.Count) list[same] = r;
+                        else if (r.LogFrom < list[same].LogFrom - 1 || (Math.Abs(r.LogFrom - list[same].LogFrom) <= 1 && r.Laps.Count > list[same].Laps.Count)) list[same] = r;
                     }
                 }
                 _cache = list;
@@ -125,11 +127,12 @@ namespace User.TeamPace
         /// <summary>The same car in the same race: same circuit and car, started together.</summary>
         public static bool SameRace(LmuSessionRecord a, LmuSessionRecord b)
         {
-            if (a == null || b == null || !a.IsRace || !b.IsRace) return false;
+            if (a == null || b == null || a.IsRace != b.IsRace || a.IsQuali != b.IsQuali) return false;
             if (!string.Equals(a.TrackDisplayName, b.TrackDisplayName, StringComparison.OrdinalIgnoreCase)) return false;
             if (a.BlockStartUtc == DateTime.MinValue || b.BlockStartUtc == DateTime.MinValue) return false;
             var gap = (a.BlockStartUtc - b.BlockStartUtc).Duration();
             if (gap <= TimeSpan.FromMinutes(3)) return true;
+            if (!a.IsRace) return false;
             // An older TeamPace dated a joined race at the join: same car, within the race
             bool sameCar = a.CarNumber == b.CarNumber && a.CarNumber > 0 &&
                            string.Equals((a.TeamName ?? "").Trim(), (b.TeamName ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
@@ -151,7 +154,9 @@ namespace User.TeamPace
                 int mine = race.LapsOf(driver);
                 if (mine == 0) continue;
                 int i = sessions.FindIndex(s => SameRace(s, race.Session));
-                if (i >= 0 && !string.IsNullOrEmpty(sessions[i].TeamDrivers)) continue;   // already split by his TeamPace
+                // Kept when his own TeamPace split it the same way; otherwise the best-informed
+                // version wins (a driver who joined late does not see who drove before)
+                if (i >= 0 && !string.IsNullOrEmpty(sessions[i].TeamDrivers) && sessions[i].TotalLaps == mine) continue;
                 var rebuilt = Rebuild(race, driver);
                 if (i >= 0) sessions[i] = rebuilt; else sessions.Add(rebuilt);
             }
@@ -211,6 +216,7 @@ namespace User.TeamPace
         }
 
         /// <summary>Every car of the race a session belongs to, from the shared races.</summary>
+        // (only races carry every car; a shared practice or qualifying has its laps only)
         public static RaceField FieldFor(LmuSessionRecord session)
         {
             if (session == null || !session.IsRace) return null;

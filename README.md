@@ -178,7 +178,8 @@ par pilote, **plus c'est bas, plus c'est rapide** (★ = record, anneau doré = 
 
 Une ligne par session, groupées par jour. Une session courue par plusieurs pilotes affichés n'occupe
 qu'**une ligne** (fond doré), avec le résultat de chacun dans son bloc et l'écart au milieu. Filtres :
-type de session (dont **Courses en équipe**), catégorie, circuit et **⇄ Communes uniquement** ; le
+type de session, **mode** (*hors ligne*, *en ligne* seul dans la voiture, *équipage* en ligne
+avec la voiture partagée, repéré sur chaque ligne), catégorie, circuit et **⇄ Communes uniquement** ; le
 menu **⋯** garde les filtres rares (simulation complète). Les sessions
 sans aucun tour chronométré sont masquées (un lien les réaffiche). Double-clic : l'analyse.
 
@@ -231,10 +232,12 @@ ou une déconnexion). TeamPace rassemble ces fichiers, garde la course une seule
 chacun **ses propres tours** (meilleur tour, rythme, arrêts), avec le résultat de la voiture. La
 carte de session donne l'équipage au survol (par exemple *Amaury Marin 75 · Pascal Marin 51 tours*).
 
-La course entière (chaque tour avec son pilote, le résultat, toutes les voitures) est aussi écrite
-dans le dossier d'équipe, sous-dossier `races` : chaque membre de l'équipage la retrouve avec ses
-propres tours, même si son TeamPace ne l'a pas importée ou est plus ancien. Dans l'**Historique**,
-une course en équipe porte le repère **ÉQUIPAGE**, et le filtre **Courses en équipe** les isole.
+Chaque session en équipage (essais, qualif ou course : chaque tour avec son pilote, le résultat, et
+pour une course toutes les voitures) est aussi écrite dans le dossier d'équipe, sous-dossier
+`races` : chaque membre de l'équipage la retrouve avec ses propres tours, même si son TeamPace ne
+l'a pas importée. Quand un pilote a rejoint la session plus tard que l'autre, c'est la version de
+celui qui l'a vue depuis le plus tôt qui compte. Dans l'**Historique**, ces sessions portent le
+repère **ÉQUIPAGE**, et le filtre **Mode** les isole.
 
 ### Analyse d'une session : course
 
@@ -248,7 +251,8 @@ seule page (le même bloc que dans [Stratégie › Analyse de course](#analyse-d
 - **Toutes les voitures** : tours, rythme, arrêts, temps aux stands, relais et le déroulé de la
   course de chacune (légende au-dessus du tableau). Les cases à cocher choisissent les voitures de la
   courbe **d'écart au premier, tour par tour** ; *Toutes*, *Autour de nous* (les trois voitures
-  devant et derrière) ou *Aucune* en un clic.
+  devant et derrière) ou *Aucune* en un clic. Survoler le nom d'une équipe à droite de la courbe
+  la met en évidence ; un clic la garde en évidence (●), un nouveau clic la relâche.
 
 ![Toutes les voitures de la catégorie](docs/images/16-analyse-de-course.png)
 
@@ -395,7 +399,7 @@ administrateur. Le lien **Vérifier les mises à jour**, en bas à droite du plu
 | Le dossier d'équipe est introuvable dans « Choisir… » | Le coéquipier doit d'abord l'**ajouter à son Drive** (étape 3.3). |
 | Pas de télémétrie pour un pilote | Il doit avoir TeamPace 2.6 ou plus et cliquer une fois sur **⟳ Tout mettre à jour**. La télémétrie de LMU doit être active (dossier `UserData\Telemetry` non vide). |
 | Rien n'arrive chez les coéquipiers (base, télémétrie, plans) | Google Drive a peut-être changé de lettre de lecteur (par exemple J: → I:) : TeamPace retrouve le dossier tout seul s'il existe sur une autre lettre. S'il reste introuvable, un ⚠ s'affiche en haut et dans les réglages : lancez Google Drive, ou choisissez de nouveau le dossier avec **📁 Choisir…**. |
-| Une course en équipe n'apparaît que chez le pilote de l'arrivée | Depuis la 3.7, il suffit qu'un des pilotes ait TeamPace à jour : la course est partagée dans le dossier d'équipe (`races`) et chacun y retrouve ses tours. Cliquez sur **⟳ Tout mettre à jour** chez les deux. |
+| Une session en équipe n'apparaît que chez un pilote, ou avec les tours de l'autre | Mettez TeamPace à jour (4.0.1 ou plus) : chaque session en équipage est partagée dans le dossier d'équipe (`races`) et chacun y retrouve ses tours. Cliquez sur **⟳ Tout mettre à jour** chez les deux. |
 | Colonnes carburant / pneus vides | Ces valeurs sont capturées en direct : roulez avec SimHub ouvert. En ligne, LMU ne les écrit pas dans ses fichiers de résultats. |
 
 ## Pour le développeur

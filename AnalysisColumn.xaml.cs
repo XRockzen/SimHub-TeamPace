@@ -110,8 +110,8 @@ namespace User.TeamPace
             SimBadges.Children.Clear();
             AddBadge(r.IsFullSim ? "SIM" : "ARCADE", r.IsFullSim ? "#991565B0" : "#99666666",
                      r.IsFullSim ? "Simulation complète : dégâts, carburant et usure réalistes" : "Dégâts, carburant ou usure réduits");
-            AddBadge(r.Setting == "Multiplayer" ? "MULTI" : "SOLO", r.Setting == "Multiplayer" ? "#998B5523" : "#992E7D32",
-                     r.Setting == "Multiplayer" ? "Course en ligne" : "Hors ligne");
+            AddBadge(r.Mode.ToUpperInvariant(), r.ModeBg,
+                     r.IsCrew ? "En ligne, voiture partagée : " + r.TeamDrivers + " tours" : r.IsOnline ? "En ligne, seul dans la voiture" : "Hors ligne");
 
             var laps = LmuSessionStore.GetLapsForSession(r.FileId, Driver.DbPath);
             int liveMatched = MergeLiveData(r, laps, Driver.DbPath);
