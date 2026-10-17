@@ -41,6 +41,13 @@ namespace User.TeamPace
             Session = session;
             InitializeComponent();
             LapGrid.MouseDoubleClick += LapGrid_MouseDoubleClick;
+            // The table shows every lap; the page scrolls, the wheel over the table included
+            LapGrid.PreviewMouseWheel += (s, e) =>
+            {
+                if (e.Handled) return;
+                e.Handled = true;
+                RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = UIElement.MouseWheelEvent, Source = this });
+            };
             Loaded   += (s, e) => { Folded += ApplyFolds; ApplyFolds(); };
             Unloaded += (s, e) => Folded -= ApplyFolds;
             Build();
@@ -203,10 +210,7 @@ namespace User.TeamPace
 
         /// <summary>Same height for every driver's pit block, sized on the longest list.</summary>
         /// <summary>The lap table fills the visible height; the blocks above scroll away.</summary>
-        public void SetLapTableHeight(double height)
-        {
-            LapGrid.Height = Math.Max(260, height);
-        }
+        public void SetLapTableHeight(double height) { }
 
         public void SetPitBlockStops(int stops) { }
 
@@ -484,15 +488,16 @@ namespace User.TeamPace
             return cnt > 0 ? sum / cnt : double.NaN;
         }
 
-        /// <summary>A tyre square: its wear per lap, from green (light) to red (heavy).</summary>
-        private static void Tyre(Border square, TextBlock text, double wear)
+        /// <summary>A tyre of the top view: coloured by its wear per lap (green light, amber, coral heavy), the value beside it.</summary>
+        private static void Tyre(Border tyre, TextBlock text, double wear)
         {
-            if (double.IsNaN(wear)) { text.Text = "—"; square.Background = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)); return; }
+            if (double.IsNaN(wear)) { text.Text = "—"; tyre.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)); return; }
             text.Text = string.Format(Inv, "{0:F2} %", wear);
-            double k = Math.Max(0, Math.Min(1, (wear - 0.3) / 0.9));   // 0.3 %/lap → green, 1.2 %/lap → red
-            var green = Color.FromRgb(0x2E, 0x7D, 0x32); var amber = Color.FromRgb(0xC7, 0x8A, 0x10); var red = Color.FromRgb(0xC6, 0x28, 0x28);
+            double k = Math.Max(0, Math.Min(1, (wear - 0.3) / 0.9));   // 0.3 %/lap → green, 1.2 %/lap → coral
+            var green = Color.FromRgb(0x4C, 0xAF, 0x7D); var amber = Color.FromRgb(0xF2, 0xB1, 0x3C); var coral = Color.FromRgb(0xEF, 0x6C, 0x5A);
             Func<Color, Color, double, Color> mix = (a, b, t) => Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
-            square.Background = new SolidColorBrush(k < 0.5 ? mix(green, amber, k * 2) : mix(amber, red, (k - 0.5) * 2));
+            var c = k < 0.5 ? mix(green, amber, k * 2) : mix(amber, coral, (k - 0.5) * 2);
+            tyre.Background = new LinearGradientBrush(c, Color.FromArgb(200, c.R, c.G, c.B), 90);
         }
 
         // Measured when captured live, otherwise estimated from lap times:

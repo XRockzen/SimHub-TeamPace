@@ -158,29 +158,29 @@
                 <TextBlock x:Name="TxtStVeTot" Style="{StaticResource BlockLine}"/>
             </StackPanel></Border>
 
-            <!-- The four tyres seen from above: wear per lap, the warmer the more worn -->
+            <!-- The car seen from above: four slim tyres coloured by their wear per lap, the value beside each -->
             <Border x:Name="StatsTirePanel" Style="{StaticResource AnaBlock}"><DockPanel>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource BlockTitle}" Text="USURE PAR TOUR"/>
-                <Grid HorizontalAlignment="Center" Margin="0,2,0,0">
+                <Grid HorizontalAlignment="Center" Margin="0,4,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="58"/><ColumnDefinition Width="22"/><ColumnDefinition Width="58"/>
+                        <ColumnDefinition Width="52"/><ColumnDefinition Width="10"/><ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="10"/><ColumnDefinition Width="52"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="30"/><RowDefinition Height="8"/><RowDefinition Height="30"/>
+                        <RowDefinition Height="24"/><RowDefinition Height="10"/><RowDefinition Height="24"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Column="1" Grid.RowSpan="3" Width="10" Background="#22FFFFFF" CornerRadius="3"/>
-                    <Border x:Name="SqFL" Grid.Row="0" Grid.Column="0" CornerRadius="4" ToolTip="Avant gauche">
-                        <TextBlock x:Name="TxtStTireFL" FontSize="12.5" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <Border x:Name="SqFR" Grid.Row="0" Grid.Column="2" CornerRadius="4" ToolTip="Avant droit">
-                        <TextBlock x:Name="TxtStTireFR" FontSize="12.5" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <Border x:Name="SqRL" Grid.Row="2" Grid.Column="0" CornerRadius="4" ToolTip="Arrière gauche">
-                        <TextBlock x:Name="TxtStTireRL" FontSize="12.5" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <Border x:Name="SqRR" Grid.Row="2" Grid.Column="2" CornerRadius="4" ToolTip="Arrière droit">
-                        <TextBlock x:Name="TxtStTireRR" FontSize="12.5" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <!-- Body and axles -->
+                    <Border Grid.Column="2" Grid.RowSpan="3" CornerRadius="9,9,6,6" Background="#14FFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1" Margin="0,-2,0,-2"/>
+                    <Border Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="0" Height="2" Background="#33FFFFFF" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="2" Height="2" Background="#33FFFFFF" VerticalAlignment="Center"/>
+                    <Border x:Name="SqFL" Grid.Row="0" Grid.Column="1" CornerRadius="3" ToolTip="Avant gauche"/>
+                    <Border x:Name="SqFR" Grid.Row="0" Grid.Column="3" CornerRadius="3" ToolTip="Avant droit"/>
+                    <Border x:Name="SqRL" Grid.Row="2" Grid.Column="1" CornerRadius="3" ToolTip="Arrière gauche"/>
+                    <Border x:Name="SqRR" Grid.Row="2" Grid.Column="3" CornerRadius="3" ToolTip="Arrière droit"/>
+                    <TextBlock x:Name="TxtStTireFL" Grid.Row="0" Grid.Column="0" FontSize="12.5" Foreground="#E6FFFFFF" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                    <TextBlock x:Name="TxtStTireFR" Grid.Row="0" Grid.Column="4" FontSize="12.5" Foreground="#E6FFFFFF" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="7,0,0,0"/>
+                    <TextBlock x:Name="TxtStTireRL" Grid.Row="2" Grid.Column="0" FontSize="12.5" Foreground="#E6FFFFFF" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                    <TextBlock x:Name="TxtStTireRR" Grid.Row="2" Grid.Column="4" FontSize="12.5" Foreground="#E6FFFFFF" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="7,0,0,0"/>
                 </Grid>
             </DockPanel></Border>
 

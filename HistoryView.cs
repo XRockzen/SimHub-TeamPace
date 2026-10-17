@@ -26,7 +26,9 @@ namespace User.TeamPace
         }
 
         // Filters kept while browsing
-        private static string _type = "ALL", _class, _circuit, _mode;
+        private static string _class, _circuit;
+        private static readonly HashSet<string> _types = new HashSet<string>();   // "R", "Q", "P"; none = all
+        private static readonly HashSet<string> _modes = new HashSet<string>();   // "Hors ligne", "En ligne", "Équipage"; none = all
         private static bool _commonOnly, _simOnly, _showEmpty;
         private const int PageSize = 200;
 
@@ -92,8 +94,8 @@ namespace User.TeamPace
         private bool Passes(Event e)
         {
             var s = e.Any;
-            if (_type != "ALL" && !(s.SessionType ?? "").StartsWith(_type, StringComparison.OrdinalIgnoreCase)) return false;
-            if (_mode != null && Mode(e) != _mode) return false;
+            if (_types.Count > 0 && !_types.Contains(s.IsRace ? "R" : s.IsQuali ? "Q" : "P")) return false;
+            if (_modes.Count > 0 && !_modes.Contains(Mode(e))) return false;
             if (_class != null && LmuCategoryStyle.GetShortName(s.CarClass) != _class) return false;
             if (_circuit != null && s.TrackDisplayName != _circuit) return false;
             if (_commonOnly && e.Count < 2) return false;
@@ -106,21 +108,32 @@ namespace User.TeamPace
         private void BuildFilters(int emptyCount)
         {
             _filters.Children.Clear();
-            foreach (var t in new[] { new[] { "ALL", "Tout" }, new[] { "R", "Courses" }, new[] { "Q", "Qualifs" }, new[] { "P", "Essais" } })
+            // Clickable tags, like the categories of the career: none lit = everything
+            Action<string, HashSet<string>, string, string, string> tag = (key, set, text, bg, tip) =>
             {
-                var tag = t[0];
-                var b = Ui.Button(t[1]);
-                b.Margin = new Thickness(0, 0, 6, 0);
-                Ui.SetOn(b, _type == tag);
-                b.Click += (s, e) => { _type = tag; _shown = PageSize; Refresh(); };
+                var b = Ui.Badge(text, bg, 11.5);
+                b.Padding = new Thickness(9, 3, 9, 3);
+                b.Margin = new Thickness(0, 0, 5, 0);
+                b.Cursor = Cursors.Hand;
+                b.ToolTip = tip;
+                b.Opacity = set.Count == 0 || set.Contains(key) ? 1 : 0.3;
+                b.MouseLeftButtonDown += (snd, ev) => { if (!set.Remove(key)) set.Add(key); _shown = PageSize; Refresh(); };
                 _filters.Children.Add(b);
-            }
-            _filters.Children.Add(new Border { Width = 12 });
+            };
+            _filters.Children.Add(Ui.T("Type ", 12, Ui.Muted));
+            tag("R", _types, "Courses", "#CC1565B0", "Afficher ou masquer les courses");
+            tag("Q", _types, "Qualifs", "#CC6A1E8E", "Afficher ou masquer les qualifications");
+            tag("P", _types, "Essais", "#CC2E7D32", "Afficher ou masquer les essais");
+            _filters.Children.Add(new Border { Width = 14 });
+            _filters.Children.Add(Ui.T("Mode ", 12, Ui.Muted));
+            tag("Hors ligne", _modes, "Hors ligne", "#FF55585F", "Sessions hors ligne");
+            tag("En ligne", _modes, "En ligne", "#FF1F6FB5", "En ligne, seul dans la voiture");
+            tag("Équipage", _modes, "Équipage", "#FF5E4B8B", "En ligne, voiture partagée avec des coéquipiers");
+            _filters.Children.Add(new Border { Width = 14 });
 
             var classes = new SortedSet<string>();
             var circuits = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in _events) { classes.Add(LmuCategoryStyle.GetShortName(e.Any.CarClass)); circuits.Add(e.Any.TrackDisplayName); }
-            _filters.Children.Add(Combo("Mode : tous", new[] { "Hors ligne", "En ligne", "Équipage" }, _mode, v => { _mode = v; _shown = PageSize; Refresh(); }, 140));
             _filters.Children.Add(Combo("Catégorie : toutes", classes, _class, v => { _class = v; _shown = PageSize; Refresh(); }, 170));
             _filters.Children.Add(Combo("Circuit : tous", circuits, _circuit, v => { _circuit = v; _shown = PageSize; Refresh(); }, 300));
 

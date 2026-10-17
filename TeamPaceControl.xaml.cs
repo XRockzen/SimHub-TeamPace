@@ -738,7 +738,6 @@ namespace User.TeamPace
                     _analysisCols.Add(col);
                     // The column scrolls as a whole, so the lap table stays reachable under tall blocks
                     var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = col };
-                    scroll.SizeChanged += (sv, e) => col.SetLapTableHeight(scroll.ViewportHeight - 40);
                     AddColumn(d, scroll, null);
                 }
                 else

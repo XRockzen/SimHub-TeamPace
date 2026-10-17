@@ -3,6 +3,15 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.0.2
+
+- **Usure des pneus** : la voiture vue de dessus, quatre pneus fins colorés selon l'usure par tour
+  (du vert au corail) et la valeur à côté de chacun.
+- **Tableau tour par tour** : il montre tous les tours, sans défilement interne ; c'est la page qui
+  défile (molette comprise au-dessus du tableau).
+- **Historique** : le type (courses, qualifs, essais) et le mode (hors ligne, en ligne, équipage)
+  se filtrent par étiquettes cliquables, comme les catégories de la Carrière.
+
 ## 4.0.1
 
 - **Toutes les sessions en équipage sont partagées** (essais, qualif, course), plus seulement les

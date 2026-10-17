@@ -178,8 +178,9 @@ par pilote, **plus c'est bas, plus c'est rapide** (★ = record, anneau doré = 
 
 Une ligne par session, groupées par jour. Une session courue par plusieurs pilotes affichés n'occupe
 qu'**une ligne** (fond doré), avec le résultat de chacun dans son bloc et l'écart au milieu. Filtres :
-type de session, **mode** (*hors ligne*, *en ligne* seul dans la voiture, *équipage* en ligne
-avec la voiture partagée, repéré sur chaque ligne), catégorie, circuit et **⇄ Communes uniquement** ; le
+étiquettes cliquables de **type** (courses, qualifs, essais) et de **mode** (*hors ligne*, *en
+ligne* seul dans la voiture, *équipage* en ligne avec la voiture partagée, repéré sur chaque ligne),
+puis catégorie, circuit et **⇄ Communes uniquement** ; le
 menu **⋯** garde les filtres rares (simulation complète). Les sessions
 sans aucun tour chronométré sont masquées (un lien les réaffiche). Double-clic : l'analyse.
 
@@ -195,15 +196,15 @@ Chaque colonne se lit de haut en bas :
   **invalides** : limites de piste, contacts et pénalités ;
 - les **statistiques** des tours cochés : *Rythme* (moyenne et écart à la meilleure moyenne de
   l'équipe), *Régularité*, *Carburant* (litres par tour), *Énergie virtuelle* (% par tour et
-  « 100 % = 30 tours »), *Usure* (les 4 pneus vus du dessus, du vert au rouge selon l'usure par
-  tour) et *Arrêts* (une frise des tours avec un repère par arrêt ; au survol : temps perdu, voie,
+  « 100 % = 30 tours »), *Usure* (la voiture vue de dessus, chaque pneu coloré du vert au
+  corail selon son usure par tour) et *Arrêts* (une frise des tours avec un repère par arrêt ; au survol : temps perdu, voie,
   arrêt, carburant, pneus) ;
 - le **tableau tour par tour** : **Δ pilotes** donne l'écart au plus rapide de l'équipe sur chaque
   tour (★ = le plus rapide). **Rythme** coche les tours représentatifs ; cochez ou décochez des tours
   et les statistiques se recalculent. Un double-clic sur un tour ouvre sa télémétrie.
 
 **▾ Statistiques** et **▾ Tour par tour** se replient d'un clic, chez tous les pilotes à la fois :
-statistiques repliées, le tableau prend tout l'écran. Le bouton **Télémétrie →** superpose les tours
+le tableau montre tous les tours et la page défile. Le bouton **Télémétrie →** superpose les tours
 de la séance.
 
 Le bouton **?** affiche la légende (capture ci-dessus). Les couleurs : vert = meilleur tour,
