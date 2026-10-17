@@ -63,6 +63,9 @@ namespace TeamPace.Extractor
             try
             {
                 duckdb_set_config(config, Utf8("access_mode"), Utf8("READ_ONLY"));
+                // Light on the machine: the extraction may run while the player drives the next stint
+                duckdb_set_config(config, Utf8("threads"), Utf8("2"));
+                duckdb_set_config(config, Utf8("memory_limit"), Utf8("1GB"));
                 IntPtr error;
                 if (duckdb_open_ext(Utf8(path), out _db, config, out error) != 0)
                 {

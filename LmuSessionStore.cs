@@ -24,6 +24,11 @@ namespace User.TeamPace
         // the "already parsed" flags once so those files get re-imported.
         private const int ParserVersion = 9;   // 5: shared cars split by driver, session clock origin; 6: race field; 7: race start time; 8: team races shared; 9: every shared session
 
+        /// <summary>Bumped whenever stored sessions change: views reload only then.</summary>
+        public static int DataVersion { get { return _version; } }
+        private static int _version;
+        public static void Touch() { System.Threading.Interlocked.Increment(ref _version); }
+
         public static string PlayerName  { get; private set; }
         public static string ResultsPath { get; private set; }
 
@@ -230,6 +235,7 @@ namespace User.TeamPace
                         MarkParsed(db, session.FileId);
                     }
                     if (session.Race != null) TeamRaceStore.Save(session.Race);
+                    Touch();
                 }
                 catch (Exception ex)
                 {

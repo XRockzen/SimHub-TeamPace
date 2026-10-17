@@ -127,10 +127,20 @@ namespace User.TeamPace
         private static void OnFileChanged(object sender, FileSystemEventArgs e)
             { ImportSingleFile(e.FullPath); }
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> Importing =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
         private static void ImportSingleFile(string filePath)
         {
             var fileId = Path.GetFileNameWithoutExtension(filePath);
             if (LmuSessionStore.IsFileParsed(fileId)) return;
+            if (!Importing.TryAdd(fileId, true)) return;   // the other event of the same write
+            try { ImportOnce(filePath, fileId); }
+            finally { bool x; Importing.TryRemove(fileId, out x); }
+        }
+
+        private static void ImportOnce(string filePath, string fileId)
+        {
 
             // Small delay so the game finishes writing the file
             System.Threading.Thread.Sleep(2000);

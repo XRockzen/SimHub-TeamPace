@@ -24,6 +24,7 @@ namespace User.TeamPace
 
         private BestLapRecord _currentRecord;
         private string        _lastKey;
+        private string        _lastTrack, _lastCar, _lastGame;
 
         // ─── Invalid lap tracking ─────────────────────────────────────────────
         private int    _lastCompletedLaps  = -1;
@@ -99,12 +100,11 @@ namespace User.TeamPace
             // ── Current-record tracking (sidebar delegate) ────────────────────
             var track = data.NewData.TrackName;
             var car   = data.NewData.CarModel;
-            if (!string.IsNullOrEmpty(track) && !string.IsNullOrEmpty(car))
+            if (!string.IsNullOrEmpty(track) && !string.IsNullOrEmpty(car) &&
+                (track != _lastTrack || car != _lastCar || data.GameName != _lastGame))   // no string built every frame
             {
-                var key = string.Format("{0}|{1}|{2}", data.GameName, track, car);
-                if (key != _lastKey)
+                _lastTrack = track; _lastCar = car; _lastGame = data.GameName;
                 {
-                    _lastKey = key;
                     _currentRecord = AllRecords.FirstOrDefault(r =>
                         string.Equals(r.Track, track, StringComparison.OrdinalIgnoreCase) &&
                         (string.Equals(r.CarId,          car, StringComparison.OrdinalIgnoreCase) ||
@@ -155,8 +155,9 @@ namespace User.TeamPace
 
                     if (!string.IsNullOrEmpty(lapTrack) && !string.IsNullOrEmpty(carId) && !string.IsNullOrEmpty(game))
                     {
-                        InvalidLapStore.AddLap(game, lapTrack, carId,
-                            completedLaps, _sessionId ?? "", DateTime.UtcNow);
+                        // Written off the game loop: a database write here would stutter the frame
+                        int lapNo = completedLaps; string sid = _sessionId ?? ""; var at = DateTime.UtcNow;
+                        Task.Run(() => InvalidLapStore.AddLap(game, lapTrack, carId, lapNo, sid, at));
 
                         SimHub.Logging.Current.Info(
                             string.Format("[TeamPace] Captured invalid lap #{0} — {1} / {2}",
@@ -244,8 +245,9 @@ namespace User.TeamPace
                 try
                 {
                     if (!LmuTeamSync.IsConfigured) return;
-                    if (LmuTeamSync.PullTeammates() > 0 | TelemetryService.PullTeam() > 0) TelemetryService.Invalidate();
-                    NotificationService.Check();
+                    int pulled = LmuTeamSync.PullTeammates();
+                    if (pulled > 0 | TelemetryService.PullTeam() > 0) TelemetryService.Invalidate();
+                    if (pulled > 0) { LmuSessionStore.Touch(); NotificationService.Check(); }   // nothing new: nothing to read
                 }
                 catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Team watch: " + ex.Message); }
             }, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
@@ -274,6 +276,7 @@ namespace User.TeamPace
             AllRecords = new List<BestLapRecord>();
             LastGame   = null;
             _lastKey   = null;
+            _lastTrack = _lastCar = _lastGame = null;
             _currentRecord = null;
 
             var dataPath = PluginsDataPath;

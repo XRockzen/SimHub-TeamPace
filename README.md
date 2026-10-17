@@ -195,8 +195,8 @@ Chaque colonne se lit de haut en bas :
   invalides. Au survol du **théorique** : les trois meilleurs secteurs et leur tour ; au survol des
   **invalides** : limites de piste, contacts et pénalités ;
 - les **statistiques** des tours cochés : *Rythme* (moyenne et écart à la meilleure moyenne de
-  l'équipe), *Régularité*, *Carburant* (litres par tour), *Énergie virtuelle* (% par tour et
-  « 100 % = 30 tours »), *Usure* (la voiture vue de dessus, chaque pneu coloré du vert au
+  l'équipe), *Régularité*, *Consommation* (l'énergie virtuelle par tour en grand, une jauge d'un
+  plein découpée en tours, l'essence par tour à côté), *Usure* (la voiture vue de dessus, chaque pneu coloré du vert au
   corail selon son usure par tour) et *Arrêts* (une frise des tours avec un repère par arrêt ; au survol : temps perdu, voie,
   arrêt, carburant, pneus) ;
 - le **tableau tour par tour** : **Δ pilotes** donne l'écart au plus rapide de l'équipe sur chaque
@@ -356,7 +356,9 @@ Choisissez une course courue sur ce circuit : la même page que l'onglet **Cours
 ### Données mesurées
 
 Mesurées sur vos sessions sur ce circuit et dans cette catégorie : rythme et dégradation de chaque
-pilote, consommation, énergie virtuelle, usure des pneus, temps aux stands, débit d'essence,
+pilote, consommation, énergie virtuelle, usure des pneus, **arrêt complet en course** (le temps
+perdu à vos arrêts réels, voie, service et relais compris : le plan s'y cale), voie des stands,
+débit d'essence,
 changement des pneus, durée d'un train. La source de chaque valeur est indiquée ; tapez une autre
 valeur pour la remplacer (elle passe en jaune), effacez-la pour revenir à la mesure.
 

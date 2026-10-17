@@ -168,6 +168,9 @@ namespace User.TeamPace
         /// <summary>Driving time of a session: finish time, or best lap × laps as a proxy.</summary>
         public static TimeSpan SessionDuration(LmuSessionRecord s)
         {
+            // A shared car's race time is the whole car's: each driver drove his share of the laps
+            if (s.FinishTime.Ticks > 0 && s.IsCrew && s.CarLaps > 0)
+                return TimeSpan.FromTicks(s.FinishTime.Ticks * Math.Min(s.TotalLaps, s.CarLaps) / s.CarLaps);
             if (s.FinishTime.Ticks > 0) return s.FinishTime;
             if (s.BestLapTime.Ticks > 0 && s.TotalLaps > 0)
                 return TimeSpan.FromTicks(s.BestLapTime.Ticks * s.TotalLaps);

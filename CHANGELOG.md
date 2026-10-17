@@ -3,6 +3,42 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.1.0
+
+Audit technique : justesse des calculs et charge de la machine.
+
+**Calculs corrigés**
+
+- **Stratégie, temps aux stands** : il est maintenant calé sur vos **courses réelles**
+  (« Arrêt complet en course » : médiane du temps perdu à vos arrêts, voie, service et relais
+  compris). Un arrêt complet coûte ce temps, un arrêt plus léger moins. Avant, un bug mélangeait
+  sur une voiture partagée le tour d'entrée d'un arrêt et le tour de sortie d'un autre.
+- Ce que SimHub capte à un arrêt avec changement de pilote est coupé (le pilote qui descend ne voit
+  plus la voiture) : ces arrêts ne servent plus à mesurer le débit d'essence ni le temps des pneus.
+  L'essence et les pneus sont faits en même temps à l'arrêt.
+- **Énergie virtuelle par tour** : moyenne robuste au lieu de la médiane. LMU l'écrit par paliers
+  (3,1 / 3,5 %) et la médiane la surestimait d'environ 4 % (relais trop courts d'un tour).
+- **Roulage** : sur une course partagée, chacun ne compte plus que sa part (avant : la durée de toute
+  la course pour chaque pilote).
+- **Arrêts d'une voiture partagée** (onglet Tours) : les mêmes que dans l'onglet Course, avec le temps
+  perdu complet, chez le pilote qui est rentré au stand.
+- Les notifications voient les sessions en équipage comme les écrans (pas de faux record).
+
+**Moins de charge pendant que vous roulez**
+
+- L'extraction de la télémétrie tourne en priorité basse et sur 2 cœurs au plus.
+- L'enregistrement d'un tour invalide ne se fait plus dans la boucle de jeu ; plus d'allocation à
+  chaque image.
+- Un fichier de résultats n'est plus importé deux fois en parallèle.
+- La surveillance de l'équipe (toutes les 5 minutes) ne relit les données que si un fichier a changé.
+- Les sessions et les courses d'équipe ne sont relues que quand elles changent ; l'onglet *Course*
+  se calcule en arrière-plan.
+
+**Écran**
+
+- **Consommation** : énergie virtuelle mise en avant, avec une jauge d'un plein découpée en tours,
+  et l'essence à côté.
+
 ## 4.0.2
 
 - **Usure des pneus** : la voiture vue de dessus, quatre pneus fins colorés selon l'usure par tour

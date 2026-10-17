@@ -58,6 +58,7 @@ namespace User.TeamPace
 
         private double   _prevFuel = -1;
         private double[] _prevTyre;
+        private double[] _tyreBuf = new double[4];
 
         // Current pit stop
         private bool     _inLane;
@@ -88,9 +89,10 @@ namespace User.TeamPace
                 ResetSession(track);
 
             AccumulateFuel(d.Fuel, _inLane);
-            AccumulateWear(new[] { d.TyreWearFrontLeft, d.TyreWearFrontRight,
-                                   d.TyreWearRearLeft,  d.TyreWearRearRight },
-                           _inLane && d.SpeedKmh < StoppedKmh);
+            // Two buffers swapped every tick: no allocation per frame
+            var tyre = _tyreBuf;
+            tyre[0] = d.TyreWearFrontLeft; tyre[1] = d.TyreWearFrontRight; tyre[2] = d.TyreWearRearLeft; tyre[3] = d.TyreWearRearRight;
+            AccumulateWear(tyre, _inLane && d.SpeedKmh < StoppedKmh);
             TrackPit(d, now, dt, completed);
 
             if (completed < 0) return;
@@ -148,6 +150,7 @@ namespace User.TeamPace
                     else _wear[i] += step;
                 }
             }
+            _tyreBuf = _prevTyre ?? new double[4];
             _prevTyre = tyre;
         }
 

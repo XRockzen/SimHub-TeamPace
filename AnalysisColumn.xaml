@@ -147,16 +147,20 @@
                 <TextBlock x:Name="TxtStSpread" Style="{StaticResource BlockLine}"/>
             </StackPanel></Border>
 
-            <Border x:Name="StatsFuelPanel" Style="{StaticResource AnaBlock}"><StackPanel>
-                <TextBlock Style="{StaticResource BlockTitle}" Text="CARBURANT"/>
-                <TextBlock x:Name="TxtStFuelAvg" Style="{StaticResource BlockBig}"/>
-            </StackPanel></Border>
-
-            <Border x:Name="StatsVePanel" Style="{StaticResource AnaBlock}"><StackPanel>
-                <TextBlock Style="{StaticResource BlockTitle}" Text="ÉNERGIE VIRTUELLE"/>
-                <TextBlock x:Name="TxtStVeAvg" Style="{StaticResource BlockBig}"/>
-                <TextBlock x:Name="TxtStVeTot" Style="{StaticResource BlockLine}"/>
-            </StackPanel></Border>
+            <!-- Consumption: virtual energy first (what sets the stints), the fuel beside it -->
+            <Border x:Name="StatsConsoPanel" Style="{StaticResource AnaBlock}"><DockPanel>
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource BlockTitle}" Text="CONSOMMATION"/>
+                <StackPanel x:Name="FuelSide" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="10,2,0,0" HorizontalAlignment="Right">
+                    <TextBlock Text="essence" FontSize="11" Foreground="#99FFFFFF" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="TxtStFuelAvg" FontSize="14" FontWeight="SemiBold" Foreground="#E6FFFFFF" HorizontalAlignment="Right"/>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock x:Name="TxtStVeAvg" Style="{StaticResource BlockBig}"/>
+                    <!-- One cell per lap a full energy lasts -->
+                    <UniformGrid x:Name="VeCells" Rows="1" Height="9" Margin="0,5,0,3"/>
+                    <TextBlock x:Name="TxtStVeTot" Style="{StaticResource BlockLine}"/>
+                </StackPanel>
+            </DockPanel></Border>
 
             <!-- The car seen from above: four slim tyres coloured by their wear per lap, the value beside each -->
             <Border x:Name="StatsTirePanel" Style="{StaticResource AnaBlock}"><DockPanel>

@@ -19,6 +19,7 @@ namespace User.TeamPace
         public string Key    { get { return Driver.DbPath ?? ""; } }
 
         private List<LmuSessionRecord> _sessions;
+        private int _version = -1;
 
         public DriverView(TeamDriver driver, string colorHex)
         {
@@ -32,8 +33,9 @@ namespace User.TeamPace
         {
             get
             {
-                if (_sessions == null)
+                if (_sessions == null || _version != LmuSessionStore.DataVersion)
                 {
+                    _version = LmuSessionStore.DataVersion;
                     // Team races this driver drove in, as the crew shared them
                     _sessions = TeamRaceStore.Complete(Name, LmuSessionStore.GetAllSessions(DbPath));
                     _sessions.Sort((a, b) => b.SessionDate.CompareTo(a.SessionDate));
@@ -42,7 +44,8 @@ namespace User.TeamPace
             }
         }
 
-        public void Invalidate() { _sessions = null; }
+        /// <summary>Sessions are read again only if the stored data changed since.</summary>
+        public void Invalidate() { }
 
         public LmuSessionRecord FindMatch(LmuSessionRecord other)
         {

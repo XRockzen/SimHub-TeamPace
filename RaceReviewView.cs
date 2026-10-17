@@ -61,28 +61,45 @@ namespace User.TeamPace
         {
             _drivers = drivers;
             _plan = plan;
-            var pits = new Dictionary<int, LmuLivePit>();
-            var field = FieldFor(drivers, race, pits);
+            Children.Add(Ui.T("Chargement de la course…", 13, Ui.Faint));
+            // Laps of every driver, live captures, measures and simulation: off the interface thread
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                RaceField field = null; StrategyEngine.Simulation sim = null; StrategyReview review = null;
+                try
+                {
+                    var pits = new Dictionary<int, LmuLivePit>();
+                    field = FieldFor(drivers, race, pits);
+                    if (field != null)
+                    {
+                        if (plan != null && plan.Drivers.Count > 0)
+                        {
+                            try
+                            {
+                                var measures = StrategyEngine.Measure(drivers, plan.Circuit, plan.ClassLabel, plan.TankL);
+                                StrategyEngine.ApplyOverrides(measures, plan);
+                                sim = StrategyEngine.Simulate(plan, measures, false);
+                                if (sim.Stints.Count == 0) sim = null;
+                                else _energy = sim.EnergyMode;
+                            }
+                            catch { sim = null; }
+                        }
+                        review = StrategyReview.Build(field, sim, pits);
+                    }
+                }
+                catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Race review: " + ex.Message); }
+                Dispatcher.BeginInvoke(new Action(() => Show(field, sim, review)));
+            });
+        }
+
+        private void Show(RaceField field, StrategyEngine.Simulation sim, StrategyReview review)
+        {
+            Children.Clear();
             if (field == null)
             {
                 Children.Add(Ui.T("Les données de toutes les voitures manquent pour cette course : « ⟳ Tout mettre à jour ».", 13, Ui.Muted));
                 return;
             }
-
-            StrategyEngine.Simulation sim = null;
-            if (plan != null && plan.Drivers.Count > 0)
-            {
-                try
-                {
-                    var measures = StrategyEngine.Measure(drivers, plan.Circuit, plan.ClassLabel, plan.TankL);
-                    StrategyEngine.ApplyOverrides(measures, plan);
-                    sim = StrategyEngine.Simulate(plan, measures, false);
-                    if (sim.Stints.Count == 0) sim = null;
-                    else _energy = sim.EnergyMode;
-                }
-                catch { sim = null; }
-            }
-            var review = StrategyReview.Build(field, sim, pits);
             if (review != null)
             {
                 Children.Add(Kpis(sim, review));

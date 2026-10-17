@@ -172,7 +172,7 @@ namespace User.TeamPace
             var drivers = LmuTeamSync.GetDrivers();
             if (drivers.Count == 0) return;
             var me = drivers[0];
-            var mySessions = LmuSessionStore.GetAllSessions(null);
+            var mySessions = TeamRaceStore.Complete(me.Name, LmuSessionStore.GetAllSessions(null));
             var myBests = Bests(mySessions);
             var news = new List<TeamNotification>();
 
@@ -189,7 +189,7 @@ namespace User.TeamPace
                         {
                             var mate = drivers[i];
                             var id = Path.GetFileName(mate.DbPath);
-                            var sessions = LmuSessionStore.GetAllSessions(mate.DbPath);
+                            var sessions = TeamRaceStore.Complete(mate.Name, LmuSessionStore.GetAllSessions(mate.DbPath));
                             var bests = Bests(sessions);
                             mates.Add(new KeyValuePair<TeamDriver, Dictionary<string, LmuCircuitBestRow>>(mate, bests));
 

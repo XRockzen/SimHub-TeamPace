@@ -769,7 +769,8 @@ namespace User.TeamPace
         private static string Editable(string param, double v)
         {
             if (param == StrategyEngine.Pace) return Fmt.LapSec(v);
-            if (param == StrategyEngine.TyreLife || param == StrategyEngine.LaneLoss || param == StrategyEngine.Tyres4) return v.ToString("0", Inv);
+            if (double.IsNaN(v)) return "";
+            if (param == StrategyEngine.TyreLife || param == StrategyEngine.LaneLoss || param == StrategyEngine.Tyres4 || param == StrategyEngine.StopReal) return v.ToString("0", Inv);
             return v.ToString(param == StrategyEngine.Degradation ? "0.000" : "0.00", Inv);
         }
 

@@ -196,8 +196,25 @@ namespace User.TeamPace
                 if (row.IsPitLap) { HasPits = true; PitCount++; }
             }
             ShowRaceControlSummary();
-            // A shared car's result counts the car's stops: this column shows the driver's own
-            if (!string.IsNullOrEmpty(r.TeamDrivers)) KpiPits.Text = PitCount.ToString();
+            // A shared car's race: the car's stops (found the same way as in the "Course" tab),
+            // those this driver came in for, with the whole cost (the out-lap is the teammate's)
+            if (r.IsRace && r.IsCrew)
+            {
+                try
+                {
+                    var field = LmuSessionStore.GetField(r.FileId, Driver.DbPath) ?? TeamRaceStore.FieldFor(r);
+                    var car = field != null ? field.Cars.Find(c => c.IsUs) : null;
+                    if (car != null)
+                    {
+                        var own = new HashSet<int>();
+                        foreach (var row in _rows) own.Add(row.LapNum);
+                        _carStops = RaceFieldAnalysis.Run(car).Stops.FindAll(st => own.Contains(st.Lap));
+                        HasPits = true;
+                    }
+                }
+                catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Car stops: " + ex.Message); }
+            }
+            if (!string.IsNullOrEmpty(r.TeamDrivers)) KpiPits.Text = (_carStops != null ? _carStops.Count : PitCount).ToString();
             TxtDate.ToolTip = liveMatched > 0
                 ? string.Format(Inv, "Capture directe SimHub : {0} tour(s) (carburant, usure, arrêts)", liveMatched)
                 : "Pas de capture directe : SimHub n'était pas ouvert pendant la session";
@@ -252,6 +269,7 @@ namespace User.TeamPace
             if (KpiGridPanel.Rows != rows) KpiGridPanel.Rows = rows;
         }
 
+        private bool _energyCar = true;
         public bool HasFuel  { get; private set; }
         public bool HasVe    { get; private set; }
         public bool HasTyres { get; private set; }
@@ -263,8 +281,11 @@ namespace User.TeamPace
         /// </summary>
         public void SetOptionalBlocks(bool fuel, bool ve, bool tyres, bool pits)
         {
-            StatsFuelPanel.Visibility = fuel  ? Visibility.Visible : Visibility.Collapsed;
-            StatsVePanel.Visibility   = ve    ? Visibility.Visible : Visibility.Collapsed;
+            StatsConsoPanel.Visibility = fuel || ve ? Visibility.Visible : Visibility.Collapsed;
+            // Without virtual energy, the fuel takes the big place
+            FuelSide.Visibility = fuel && ve ? Visibility.Visible : Visibility.Collapsed;
+            VeCells.Visibility  = ve ? Visibility.Visible : Visibility.Collapsed;
+            _energyCar = ve;
             StatsTirePanel.Visibility = tyres ? Visibility.Visible : Visibility.Collapsed;
             StatsPitPanel.Visibility  = pits  ? Visibility.Visible : Visibility.Collapsed;
             ColFuel.Visibility        = fuel  ? Visibility.Visible : Visibility.Collapsed;
@@ -466,8 +487,8 @@ namespace User.TeamPace
                 if (l > 0) left = l;
             }
             string unit = litres ? "L" : "% rés.";
-            if (cnt == 0) { TxtStFuelAvg.Text = "—"; return; }
-            TxtStFuelAvg.Text = string.Format(Inv, "{0:F2} {1}/tour", tot / cnt, unit);
+            TxtStFuelAvg.Text = cnt == 0 ? "—" : string.Format(Inv, "{0:F2} {1}/tour", tot / cnt, unit);
+            if (!_energyCar) { TxtStVeAvg.Text = TxtStFuelAvg.Text; TxtStVeTot.Text = "essence"; }
         }
 
         private void UpdateEnergy(List<AnalysisLapRow> sel)
@@ -475,10 +496,27 @@ namespace User.TeamPace
             float tot = 0f; int cnt = 0;
             foreach (var row in sel)
                 if (!row.IsPitLap && row.Lap.VirtualEnergyUsed > 0) { tot += row.Lap.VirtualEnergyUsed * 100f; cnt++; }
+            if (!_energyCar) return;
+            VeCells.Children.Clear();
             if (cnt == 0) { TxtStVeAvg.Text = "—"; TxtStVeTot.Text = ""; return; }
             float avg = tot / cnt;
             TxtStVeAvg.Text = string.Format(Inv, "{0:F2} %/tour", avg);
-            TxtStVeTot.Text = string.Format(Inv, "100 % = {0:F1} tours", 100f / avg);
+            TxtStVeTot.Text = string.Format(Inv, "{0:F1} tours / plein", 100f / avg);
+            // A full energy, one cell per lap it lasts (the last one partly filled)
+            double laps = 100.0 / avg;
+            int whole = (int)Math.Floor(laps);
+            for (int i = 0; i <= whole && i < 80; i++)
+            {
+                double fill = i < whole ? 1 : laps - whole;
+                if (fill <= 0.05) break;
+                VeCells.Children.Add(new Border
+                {
+                    Margin = new Thickness(0, 0, 1.5, 0), CornerRadius = new CornerRadius(1.5),
+                    Background = new SolidColorBrush(Color.FromArgb((byte)(fill < 1 ? 90 : 220), 0x5A, 0xC8, 0x8C)),
+                });
+            }
+            VeCells.Columns = Math.Max(1, VeCells.Children.Count);
+            VeCells.ToolTip = string.Format(Inv, "Un plein d'énergie (100 %) : {0:F1} tours à {1:F2} % par tour", laps, avg);
         }
 
         private static double WearPerLap(List<AnalysisLapRow> rows, Func<AnalysisLapRow, float> wear)
@@ -510,7 +548,24 @@ namespace User.TeamPace
             double refSec = refCnt > 0 ? TimeSpan.FromTicks(refSum / refCnt).TotalSeconds : 0;
 
             var items = new List<PitItem>();
-            for (int i = 0; i < _rows.Count; i++)
+            if (_carStops != null)
+            {
+                foreach (var st in _carStops)
+                {
+                    var row = _rows.FirstOrDefault(x => x.LapNum == st.Lap);
+                    var p = row != null ? row.Lap.LivePit : null;
+                    var parts = new List<string> { string.Format(Inv, "Tour {0}  ·  temps perdu {1:0} s", st.Lap, st.Loss) };
+                    if (st.Swap != null) parts.Add("relais " + st.Swap.From + " → " + st.Swap.To);
+                    if (p != null)
+                    {
+                        parts.Add(string.Format(Inv, "voie {0:F1} s  ·  arrêt {1:F1} s", p.LaneSec, p.StoppedSec));
+                        if (p.FuelAddedL > 0.5) parts.Add(string.Format(Inv, "+{0:F1} L", p.FuelAddedL));
+                        if (p.TyresCount > 0) parts.Add(p.TyresCount == 1 ? "1 pneu" : p.TyresCount + " pneus");
+                    }
+                    items.Add(new PitItem { Lap = st.Lap, Loss = st.Loss, Tyres = -1, Detail = string.Join("\n", parts) });
+                }
+            }
+            for (int i = 0; i < _rows.Count && _carStops == null; i++)
             {
                 var row = _rows[i];
                 if (!row.IsPitLap) continue;
@@ -544,6 +599,7 @@ namespace User.TeamPace
         }
 
         private List<PitItem> _pits = new List<PitItem>();
+        private List<CarStop> _carStops;   // shared car's race: the car's stops this driver came in for
 
         private void PitStrip_SizeChanged(object sender, SizeChangedEventArgs e) { DrawPits(); }
 

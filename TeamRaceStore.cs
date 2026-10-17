@@ -43,6 +43,8 @@ namespace User.TeamPace
         private static readonly object Sync = new object();
         private static List<TeamRace> _cache;
         private static DateTime _cacheAt;
+        private static readonly Dictionary<string, KeyValuePair<DateTime, TeamRace>> Files =
+            new Dictionary<string, KeyValuePair<DateTime, TeamRace>>(StringComparer.OrdinalIgnoreCase);
 
         private static string LocalDir
         {
@@ -100,6 +102,8 @@ namespace User.TeamPace
             {
                 if (_cache != null && (DateTime.UtcNow - _cacheAt).TotalSeconds < 60) return _cache;
                 var list = new List<TeamRace>();
+                bool changed = _cache == null;
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var dir in new[] { LocalDir, TeamDir })
                 {
                     if (dir == null || !Directory.Exists(dir)) continue;
@@ -107,8 +111,18 @@ namespace User.TeamPace
                     try { files = Directory.GetFiles(dir, "*.json"); } catch { continue; }
                     foreach (var f in files)
                     {
+                        seen.Add(f);
                         TeamRace r = null;
-                        try { r = Newtonsoft.Json.JsonConvert.DeserializeObject<TeamRace>(File.ReadAllText(f)); } catch { }
+                        DateTime stamp;
+                        try { stamp = File.GetLastWriteTimeUtc(f); } catch { continue; }
+                        KeyValuePair<DateTime, TeamRace> known;
+                        if (Files.TryGetValue(f, out known) && known.Key == stamp) r = known.Value;   // unchanged: no parsing
+                        else
+                        {
+                            try { r = Newtonsoft.Json.JsonConvert.DeserializeObject<TeamRace>(File.ReadAllText(f)); } catch { }
+                            Files[f] = new KeyValuePair<DateTime, TeamRace>(stamp, r);
+                            changed = true;
+                        }
                         if (r == null || r.Session == null || r.Laps.Count != r.Owners.Count) continue;
                         // One per session: the writer whose logs start earliest knew who drove each lap
                         var same = list.FindIndex(x => SameRace(x.Session, r.Session));
@@ -116,6 +130,8 @@ namespace User.TeamPace
                         else if (r.LogFrom < list[same].LogFrom - 1 || (Math.Abs(r.LogFrom - list[same].LogFrom) <= 1 && r.Laps.Count > list[same].Laps.Count)) list[same] = r;
                     }
                 }
+                foreach (var gone in Files.Keys.Where(k => !seen.Contains(k)).ToList()) { Files.Remove(gone); changed = true; }
+                if (changed) LmuSessionStore.Touch();   // drivers' sessions are rebuilt from these
                 _cache = list;
                 _cacheAt = DateTime.UtcNow;
                 return list;

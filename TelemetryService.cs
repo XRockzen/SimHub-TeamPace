@@ -178,6 +178,8 @@ namespace User.TeamPace
                     };
                     using (var p = Process.Start(psi))
                     {
+                        // Below the game and SimHub: it may run while the player drives
+                        try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
                         var errors = new System.Text.StringBuilder();
                         p.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (errors) errors.AppendLine(e.Data); };
                         p.BeginErrorReadLine();

@@ -1,4 +1,4 @@
-using LiteDB;
+﻿using LiteDB;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -84,9 +84,9 @@ namespace User.TeamPace
     internal static class StrategyEngine
     {
         public const string Pace = "pace", Degradation = "deg", Fuel = "fuel", Energy = "ve", Wear = "wear";
-        public const string LaneLoss = "lane", FuelRate = "rate", Tyres2 = "tyres2", Tyres4 = "tyres4", TyreLife = "life";
+        public const string LaneLoss = "lane", FuelRate = "rate", Tyres2 = "tyres2", Tyres4 = "tyres4", TyreLife = "life", StopReal = "stopreal";
         public static readonly string[] DriverParams = { Pace, Degradation, Fuel, Energy, Wear };
-        public static readonly string[] TeamParams = { LaneLoss, FuelRate, Tyres2, Tyres4, TyreLife };
+        public static readonly string[] TeamParams = { StopReal, LaneLoss, FuelRate, Tyres2, Tyres4, TyreLife };
 
         public static string Label(string p)
         {
@@ -97,7 +97,8 @@ namespace User.TeamPace
                 case Fuel:        return "Consommation";
                 case Energy:      return "Énergie virtuelle";
                 case Wear:        return "Usure pneus (le plus usé)";
-                case LaneLoss:    return "Passage aux stands (sans arrêt)";
+                case StopReal:    return "Arrêt complet en course";
+                case LaneLoss:    return "Voie des stands";
                 case FuelRate:    return "Débit de ravitaillement";
                 case Tyres2:      return "Changement de 2 pneus";
                 case Tyres4:      return "Changement des 4 pneus";
@@ -115,7 +116,8 @@ namespace User.TeamPace
                 case Fuel:        return string.Format(inv, "{0:0.00} L/tour", v);
                 case Energy:      return v > 0 ? string.Format(inv, "{0:0.0} %/tour", v) : "—";
                 case Wear:        return string.Format(inv, "{0:0.00} %/tour", v);
-                case LaneLoss:    return string.Format(inv, "{0:0} s perdues", v);
+                case LaneLoss:
+                case StopReal:    return string.Format(inv, "{0:0} s perdues", v);
                 case FuelRate:    return string.Format(inv, "{0:0.0} L/s", v);
                 case Tyres2:
                 case Tyres4:      return string.Format(inv, "+{0:0} s", v);
@@ -137,12 +139,13 @@ namespace User.TeamPace
             public Dictionary<string, StrategyValue> Team = new Dictionary<string, StrategyValue>();
         }
 
-        private class Stop { public double Stopped, Fuel, Lane, Loss; public int Tyres; }
+        private class Stop { public double Stopped, Fuel, Lane, Loss; public int Tyres; public bool Swap; }
 
         public static Measures Measure(List<DriverView> drivers, string circuit, string classLabel, double tankL)
         {
             var m = new Measures();
             var stops = new List<Stop>();
+            var raceStops = new HashSet<string>();   // a race's stop counted once, whichever driver's data it comes from
             foreach (var d in drivers)
             {
                 var dd = new DriverData { Driver = d };
@@ -190,17 +193,39 @@ namespace User.TeamPace
                         }
                     }
 
-                    // Pit stops measured live: what each part of a stop costs
-                    double pace = Median(times);
-                    for (int i = 1; i + 1 < laps.Count; i++)
+                    // Pit stops. In a race, the time each stop cost is the car's (found from LMU's
+                    // results, as in the race analysis): it holds the lane, the service and, at a
+                    // driver change, the swap. What SimHub captured at the stop gives the service.
+                    var field = s.IsRace ? (LmuSessionStore.GetField(s.FileId, d.DbPath) ?? TeamRaceStore.FieldFor(s)) : null;
+                    var car = field != null ? field.Cars.Find(c => c.IsUs) : null;
+                    if (car != null)
                     {
-                        var p = laps[i].LivePit;
-                        if (p == null || p.FromGarage) continue;
-                        double inLap = Dur(laps[i]), outLap = Dur(laps[i + 1]);
-                        var stop = new Stop { Stopped = p.StoppedSec, Fuel = p.FuelAddedL, Tyres = p.TyresCount, Lane = p.LaneSec, Loss = double.NaN };
-                        if (!double.IsNaN(pace) && inLap > 0 && outLap > pace * 0.85 && !laps[i + 1].IsPitLap)
-                            stop.Loss = inLap + outLap - 2 * pace;
-                        stops.Add(stop);
+                        foreach (var st in RaceFieldAnalysis.Run(car).Stops)
+                        {
+                            if (!raceStops.Add(s.BlockStartUtc.ToString("yyyyMMddHHmm") + "|" + st.Lap)) continue;
+                            var lap = laps.Find(l => l.LapNum == st.Lap);
+                            var p = lap != null ? lap.LivePit : null;
+                            stops.Add(new Stop
+                            {
+                                Loss = st.Loss, Swap = st.Swap != null, Stopped = p != null ? p.StoppedSec : double.NaN,
+                                Fuel = p != null ? p.FuelAddedL : 0, Tyres = p != null ? p.TyresCount : -1, Lane = p != null ? p.LaneSec : double.NaN,
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // Practice: stops captured live, the out-lap only when it really follows
+                        double pace = Median(times);
+                        for (int i = 1; i + 1 < laps.Count; i++)
+                        {
+                            var p = laps[i].LivePit;
+                            if (p == null || p.FromGarage) continue;
+                            double inLap = Dur(laps[i]), outLap = Dur(laps[i + 1]);
+                            var stop = new Stop { Stopped = p.StoppedSec, Fuel = p.FuelAddedL, Tyres = p.TyresCount, Lane = p.LaneSec, Loss = double.NaN };
+                            if (!double.IsNaN(pace) && inLap > 0 && laps[i + 1].LapNum == laps[i].LapNum + 1 && outLap > pace * 0.85 && !laps[i + 1].IsPitLap)
+                                stop.Loss = inLap + outLap - 2 * pace;
+                            stops.Add(stop);
+                        }
                     }
                 }
 
@@ -209,28 +234,36 @@ namespace User.TeamPace
                 dd.Values[Degradation] = Value(slopes.Count > 0 ? Math.Max(0, Math.Min(0.3, Median(slopes))) : double.NaN, 0.03,
                     slopes.Count > 0 ? string.Format("pente du rythme sur {0} relais de 12 tours ou plus", slopes.Count) : "pas de relais assez long : valeur par défaut");
                 dd.Values[Fuel] = Value(Median(fuel), double.NaN, string.Format("{0} tours mesurés", fuel.Count));
-                dd.Values[Energy] = Value(Median(ve), 0, ve.Count > 0 ? string.Format("résultats LMU · {0} tours", ve.Count) : "pas d'énergie virtuelle sur cette voiture");
+                // LMU writes each lap's energy in steps (3.1, 3.5 %…): the median lands on a step,
+                // a trimmed mean gives the true average
+                dd.Values[Energy] = Value(TrimmedMean(ve), 0, ve.Count > 0 ? string.Format("résultats LMU · {0} tours", ve.Count) : "pas d'énergie virtuelle sur cette voiture");
                 dd.Values[Wear] = Value(Median(wear), double.NaN, string.Format("{0} tours mesurés", wear.Count));
                 m.Drivers.Add(dd);
             }
 
-            // Team-wide pit values
+            // Team-wide pit values. LMU refuels while the tyres are changed: the service lasts as
+            // long as the longer of the two. A refuel without tyres gives the rate; a stop with
+            // tyres gives an upper bound of the rate and the tyre change time.
             var rates = new List<double>(); var tyres4 = new List<double>(); var tyres2 = new List<double>(); var lanes = new List<double>();
-            foreach (var s in stops) if (s.Fuel >= 20 && s.Tyres == 0 && s.Stopped > 3) rates.Add(s.Fuel / s.Stopped);
+            // At a driver change the leaving driver's SimHub stops seeing the car: what it captured
+            // there (fuel, time stopped) is cut short. Only stops without a swap measure the service.
+            var real = new List<double>();
+            foreach (var s in stops) if (!s.Swap && s.Fuel >= 20 && s.Tyres == 0 && s.Stopped > 3) rates.Add(s.Fuel / s.Stopped);
+            if (rates.Count == 0) foreach (var s in stops) if (!s.Swap && s.Fuel >= 20 && s.Tyres > 0 && s.Stopped > 3) rates.Add(s.Fuel / s.Stopped);
             double rate = rates.Count > 0 ? Median(rates) : double.NaN;
             foreach (var s in stops)
             {
-                if ((s.Tyres == 4 || s.Tyres == 2) && !double.IsNaN(rate))
-                {
-                    double t = s.Stopped - s.Fuel / rate;
-                    if (t > 0) (s.Tyres == 4 ? tyres4 : tyres2).Add(t);
-                }
-                if (!double.IsNaN(s.Loss)) lanes.Add(s.Loss - s.Stopped);
+                if (!s.Swap && (s.Tyres == 4 || s.Tyres == 2) && s.Stopped > 3) (s.Tyres == 4 ? tyres4 : tyres2).Add(s.Stopped);
+                if (!s.Swap && !double.IsNaN(s.Loss) && !double.IsNaN(s.Stopped)) lanes.Add(s.Loss - s.Stopped);
+                // The whole cost of a stop in a race, from LMU's results: lane, service, swap
+                if (!double.IsNaN(s.Loss) && s.Loss > 20 && s.Tyres != -2) real.Add(s.Loss);
             }
             m.Team[FuelRate] = Value(rate, 2.1, rates.Count > 0 ? string.Format("{0} ravitaillement(s) mesuré(s)", rates.Count) : "valeur par défaut");
             m.Team[Tyres2] = Value(Median(tyres2), 5, tyres2.Count > 0 ? string.Format("{0} changement(s) mesuré(s)", tyres2.Count) : "valeur par défaut");
             m.Team[Tyres4] = Value(Median(tyres4), 12, tyres4.Count > 0 ? string.Format("{0} changement(s) mesuré(s)", tyres4.Count) : "valeur par défaut");
-            m.Team[LaneLoss] = Value(Median(lanes), 25, lanes.Count > 0 ? string.Format("{0} passage(s) mesuré(s)", lanes.Count) : "valeur par défaut");
+            m.Team[LaneLoss] = Value(Median(lanes), 25, lanes.Count > 0 ? string.Format("{0} arrêt(s) sans relais mesuré(s)", lanes.Count) : "valeur par défaut");
+            m.Team[StopReal] = Value(real.Count >= 2 ? Median(real) : double.NaN, double.NaN,
+                real.Count >= 2 ? string.Format("médiane de {0} arrêts de vos courses ici (voie, service, relais) : le plan s'y cale", real.Count) : "pas encore de course ici");
             double maxWear = 0;
             foreach (var dd in m.Drivers) if (dd.Values[Wear].Measured) maxWear = Math.Max(maxWear, dd.Values[Wear].Value);
             m.Team[TyreLife] = Value(maxWear > 0 ? Math.Floor(60 / maxWear) : double.NaN, 40,
@@ -271,6 +304,17 @@ namespace User.TeamPace
             if (v.Count == 0) return double.NaN;
             var c = new List<double>(v); c.Sort();
             return c[c.Count / 2];
+        }
+
+/// <summary>Mean without the lowest and highest tenth (a refuelled or a lost lap).</summary>
+        private static double TrimmedMean(List<double> v)
+        {
+            if (v.Count == 0) return double.NaN;
+            var c = new List<double>(v); c.Sort();
+            int cut = c.Count / 10;
+            double sum = 0; int n = 0;
+            for (int i = cut; i < c.Count - cut; i++) { sum += c[i]; n++; }
+            return n > 0 ? sum / n : double.NaN;
         }
 
         private static double Slope(List<double> y)
@@ -357,6 +401,16 @@ namespace User.TeamPace
             double t2 = m.Team[Tyres2].Value, t4 = m.Team[Tyres4].Value;
             // 0 → 0, 2 → t2, 4 → t4, in between on a straight line
             Func<int, double> tyreTime = n => n <= 0 ? 0 : n <= 2 ? t2 * n / 2 : t2 + (t4 - t2) * (n - 2) / 2;
+            // Measured in real races: a full stop (full refill and 4 tyres) costs that; the lane is
+            // what remains once its service is taken off, so lighter stops cost less
+            var stopReal = m.Team[StopReal];
+            if (stopReal.Measured || stopReal.Overridden)
+            {
+                var first = m.Drivers.Find(d => d.Driver.Name == keys[0]).Values;
+                double fullLitres = sim.EnergyMode && first[Energy].Value > 0 ? 100 * first[Fuel].Value / first[Energy].Value : tank;
+                double fullService = Math.Max(Math.Min(fullLitres, tank) / rate, tyreTime(4));
+                lane = Math.Max(10, stopReal.Value - fullService);
+            }
             int life = (int)Math.Max(1, m.Team[TyreLife].Value);
             double t = 0, fuelInTank = tank, energy = 100;
             double tyreAge = 0;
@@ -427,7 +481,7 @@ namespace User.TeamPace
                 }
                 if (tyres > 0) { sim.TyresUsed += tyres; tyreAge = tyreAge * (4 - tyres) / 4; }   // a partial change leaves part of the wear
                 double refuel = add / rate;   // the fuel that goes in sets the time
-                double stopped = refuel + tyreTime(tyres);
+                double stopped = Math.Max(refuel, tyreTime(tyres));   // refuel and tyres at the same time
                 double lost = lane + stopped;
                 sim.Stops.Add(new StopPlan
                 {
