@@ -32,6 +32,7 @@ namespace User.TeamPace
         private string _sessionId           = null;   // our own session GUID
 
         private readonly LmuLiveTracker _liveTracker = new LmuLiveTracker();
+        private bool _overlayFailed;
 
         public TeamPacePlugin()
         {
@@ -63,6 +64,15 @@ namespace User.TeamPace
             TelemetryService.Init(dataDir);
             NotificationService.Init(dataDir);
             StrategyEngine.Init(dataDir);
+            OverlayService.Init(dataDir);
+
+            // Wheel buttons for the overlay (SimHub › Controls and events)
+            this.AddAction("Overlay.PageSuivante", (a, b) => OverlayService.NextPage(1), (a, b) => { });
+            this.AddAction("Overlay.PagePrecedente", (a, b) => OverlayService.NextPage(-1), (a, b) => { });
+            this.AddAction("Overlay.Action", (a, b) => OverlayService.PageAction(), (a, b) => { });
+            this.AddAction("Overlay.Afficher", (a, b) => OverlayService.ToggleVisible(), (a, b) => { });
+            this.AttachDelegate("Overlay.Delta", () => OverlayService.Delta);
+            this.AttachDelegate("Overlay.Page", () => OverlaySettings.PageName((OverlayPage)OverlaySettings.Current.Page));
 
             var dataPath = PluginsDataPath;
             Task.Run(() =>
@@ -94,6 +104,12 @@ namespace User.TeamPace
         {
             if (data.GameRunning && data.GameName == "LMU")
                 _liveTracker.Update(data);
+            if (data.GameName == "LMU")
+            {
+                // The overlay must never disturb SimHub's loop: an error is logged once
+                try { OverlayService.Update(data); }
+                catch (Exception ex) { if (!_overlayFailed) { _overlayFailed = true; SimHub.Logging.Current.Error("[TeamPace] Overlay: " + ex); } }
+            }
 
             if (IsLoading || data.NewData == null) return;
 
@@ -172,6 +188,7 @@ namespace User.TeamPace
         public void End(PluginManager pluginManager)
         {
             LmuXmlParser.StopWatcher();
+            OverlayService.Shutdown();
             if (_teamWatch != null) _teamWatch.Dispose();
             LmuTeamSync.Export();
         }

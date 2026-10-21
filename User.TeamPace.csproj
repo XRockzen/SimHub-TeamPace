@@ -74,6 +74,7 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
+    <Reference Include="System.Speech" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data" />
@@ -106,6 +107,12 @@
     <Compile Include="CoachingEngine.cs" />
     <Compile Include="CoachingView.cs" />
     <Compile Include="StrategyEngine.cs" />
+    <Compile Include="OverlaySettings.cs" />
+    <Compile Include="OverlayReference.cs" />
+    <Compile Include="OverlayService.cs" />
+    <Compile Include="OverlayView.cs" />
+    <Compile Include="OverlayWindow.cs" />
+    <Compile Include="OverlaySettingsView.cs" />
     <Compile Include="StrategyView.cs" />
     <Compile Include="StrategyReview.cs" />
     <Compile Include="RaceReviewView.cs" />

@@ -3,6 +3,25 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.3.0
+
+**Overlay en course (première version).**
+
+- Un bandeau discret au-dessus du jeu, à placer où vous voulez, avec quatre pages qu'on fait
+  défiler aux boutons du volant (actions TeamPace dans SimHub › Contrôles et événements) :
+  - **Télémétrie** : vos pédales des dernières secondes, rapport, vitesse, écart en direct avec la
+    référence ; le **fantôme** ajoute celles de la référence au même endroit de la piste ;
+  - **Coaching** : les virages du Plan de travail, la consigne avant chacun avec un compte à
+    rebours jusqu'au freinage de la référence, le bilan après, la voix en option ;
+  - **Course** : le plan de stratégie en direct (tours avant l'arrêt, essence et marge, écart au
+    plan, relais et pneus de l'arrêt) ;
+  - **Plan de travail** : la progression de la séance virage par virage.
+- Nouvel onglet **Overlay** : aperçu, taille, fond, pages, durée des courbes, référence (idéal de
+  l'équipe, mon meilleur tour, meilleur tour de l'équipe ou d'un coéquipier), circuit, voix,
+  virages travaillés, plan suivi.
+- La référence « idéal de l'équipe » est un vrai tour : le meilleur passage de chaque virage, mis
+  bout à bout avec ses pédales et sa vitesse.
+
 ## 4.2.0
 
 **Stratégie : la qualif et le choix pneu par pneu.**

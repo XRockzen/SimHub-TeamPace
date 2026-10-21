@@ -84,6 +84,8 @@
                             ToolTip="Toutes les sessions, une ligne par session">Historique</Button>
                     <Button x:Name="BtnTabStrategy" Style="{StaticResource TabBtn}" Click="BtnTabStrategy_Click"
                             ToolTip="Planificateur de course d'endurance">Stratégie</Button>
+                    <Button x:Name="BtnTabOverlay" Style="{StaticResource TabBtn}" Click="BtnTabOverlay_Click"
+                            ToolTip="L'overlay en course : télémétrie et fantôme, coaching, stratégie, plan de travail">Overlay</Button>
                     <Rectangle Width="1" Fill="#26FFFFFF" Margin="14,4,14,10"/>
                     <TextBlock Text="Pilotes" Style="{StaticResource FieldLbl}" Margin="0,0,10,6"/>
                     <StackPanel x:Name="DriverChips" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6"/>

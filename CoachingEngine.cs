@@ -139,7 +139,7 @@ namespace User.TeamPace
 
         // ─── Measures ─────────────────────────────────────────────────────────
 
-        private static List<Pass> Passes(List<Lap> laps, TrackModel.Corner c, double a, double b)
+        internal static List<Pass> Passes(List<Lap> laps, TrackModel.Corner c, double a, double b)
         {
             var list = new List<Pass>();
             foreach (var l in laps)
@@ -184,7 +184,7 @@ namespace User.TeamPace
         }
 
         /// <summary>Drops passes far from the usual time (a spin, a recording glitch).</summary>
-        private static List<Pass> Typical(List<Pass> passes)
+        internal static List<Pass> Typical(List<Pass> passes)
         {
             if (passes.Count < 3) return passes;
             var times = new List<double>();
@@ -202,7 +202,7 @@ namespace User.TeamPace
             return s / (b - a + 1);
         }
 
-        private static int Worst(double[] loss)
+        internal static int Worst(double[] loss)
         {
             int w = 0;
             for (int i = 1; i < 3; i++) if (loss[i] > loss[w]) w = i;

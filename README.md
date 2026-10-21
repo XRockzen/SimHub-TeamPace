@@ -16,8 +16,9 @@ les courses d'endurance : un planificateur calcule les relais à partir de vos p
 - [Partager avec ses coéquipiers (Google Drive)](#3-partager-avec-ses-coéquipiers-google-drive)
 - [Se comparer](#4-se-comparer)
 - [Stratégie d'endurance](#5-stratégie-dendurance)
-- [Notifications](#6-notifications)
-- [Mises à jour](#7-mises-à-jour)
+- [Overlay en course](#6-overlay-en-course)
+- [Notifications](#7-notifications)
+- [Mises à jour](#8-mises-à-jour)
 - [Dépannage](#dépannage)
 - [Historique des versions](CHANGELOG.md)
 
@@ -34,6 +35,7 @@ les courses d'endurance : un planificateur calcule les relais à partir de vos p
 | **Télémétrie** | n'importe quel tour de chaque pilote superposé : écart cumulé, vitesse, pédales, rapport, volant, régime, trajectoires sur la carte du circuit |
 | **Plan de travail** | les trois virages où gagner du temps, avec la phase et la mesure en cause |
 | **Stratégie** | planificateur d'endurance : relais, arrêts, énergie, pneus, à partir de vos mesures, modifiable à la souris |
+| **Overlay en course** | un bandeau discret au-dessus du jeu, quatre pages au volant : télémétrie et fantôme du tour idéal, coaching virage par virage (avec la voix), stratégie en direct, plan de travail |
 | **Notifications** | records battus, victoires, sessions communes de l'équipe, en pop-up et sous la cloche |
 | **Capture en direct** | pendant que vous roulez (SimHub ouvert) : litres par tour, usure par tour, temps dans la voie des stands et à l'arrêt |
 | **Automatique** | chaque session terminée dans LMU est importée seule, serveurs privés compris |
@@ -372,7 +374,53 @@ débit d'essence,
 changement des pneus, durée d'un train. La source de chaque valeur est indiquée ; tapez une autre
 valeur pour la remplacer (elle passe en jaune), effacez-la pour revenir à la mesure.
 
-## 6. Notifications
+## 6. Overlay en course
+
+Un seul bandeau, discret (760 × 150 points à 100 %), au-dessus du jeu : par exemple à la place
+du rétroviseur central. Il a quatre pages, qu'on fait défiler avec les boutons du volant.
+
+![Les quatre pages de l'overlay](docs/images/17-overlay.png)
+
+1. **Télémétrie** : votre accélérateur et votre frein des dernières secondes, le rapport, la
+   vitesse et l'écart en direct avec le tour de référence. Avec le **fantôme**, les pédales, le
+   rapport et la vitesse de la référence au même endroit de la piste s'affichent en pointillés,
+   avec l'écart sur le virage en cours.
+2. **Coaching** : les virages du Plan de travail (trois au plus). Avant chacun, la consigne
+   (« Freine 15 m plus tard ») et un compte à rebours jusqu'au point de freinage de la
+   référence, avec un trait blanc sur votre freinage précédent ; après, le bilan du passage
+   (temps gagné ou perdu, point de freinage, vitesse mini) et vos derniers passages. En option,
+   la consigne est **lue à voix haute** dans la ligne droite d'avant.
+3. **Course** : le plan de stratégie suivi en direct : tours avant le prochain arrêt, essence et
+   marge, écart avec le plan, et à l'arrêt le pilote qui prend le relais, le niveau et les pneus.
+4. **Plan de travail** : la séance en cours, virage par virage (votre écart au premier passage,
+   puis au dernier), et votre meilleur tour face à la référence.
+
+**Réglages** : l'onglet **Overlay** du plugin montre un aperçu et règle tout :
+- l'affichage (taille, fond, pages) ; **Placer l'overlay à l'écran** le montre pour le glisser où
+  vous voulez, la molette change sa taille ;
+- la durée affichée des courbes (la vitesse de défilement) et le fantôme ;
+- la **référence** : l'idéal de l'équipe (le meilleur passage de chaque virage, mis bout à bout),
+  mon meilleur tour, le meilleur tour de l'équipe ou celui d'un coéquipier ; et le circuit, qui
+  est sinon celui où vous roulez ;
+- le coaching : voix, nombre de virages, distance à laquelle la consigne s'affiche ;
+- le plan de stratégie suivi (sinon le dernier plan de l'équipe pour ce circuit).
+
+**Boutons du volant** : dans SimHub › *Contrôles et événements*, ajoutez une action TeamPace pour
+chacune et choisissez le bouton :
+
+| Bouton | Action | Effet |
+|---|---|---|
+| A | `TeamPace.Overlay.PageSuivante` | page suivante |
+| B | `TeamPace.Overlay.Action` | selon la page : fantôme, voix, arrêt suivant, référence |
+| C | `TeamPace.Overlay.PagePrecedente` | page précédente |
+| D | `TeamPace.Overlay.Afficher` | masquer ou afficher |
+
+Le jeu doit être en fenêtré ou en plein écran fenêtré (comme pour les overlays de SimHub). La
+référence se calcule à partir de la télémétrie de l'équipe : il faut des tours propres extraits
+sur ce circuit (« ⟳ Tout mettre à jour »). Pendant que vous roulez, l'overlay ne lit rien sur
+le disque et ne crée rien à chaque image : il reste léger.
+
+## 7. Notifications
 
 ![Nouveautés de l'équipe](docs/images/14-notifications.png)
 
@@ -388,7 +436,7 @@ ouvert. Un clic ouvre ce dont il s'agit (la session, le circuit) ; **✕** suppr
 **tout marquer comme lu** vide le compteur. Pendant que SimHub tourne, l'équipe est consultée toutes
 les 5 minutes.
 
-## 7. Mises à jour
+## 8. Mises à jour
 
 
 ![Bandeau de mise à jour](docs/images/08-mise-a-jour.png)

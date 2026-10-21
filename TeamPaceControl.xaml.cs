@@ -33,7 +33,7 @@ namespace User.TeamPace
     /// </summary>
     public partial class TeamPaceControl : UserControl
     {
-        private enum Screen { Career, History, Strategy, Circuit, Analysis }
+        private enum Screen { Career, History, Strategy, Circuit, Analysis, Overlay }
         private enum CircuitTab { Progress, Telemetry, Work }
 
         private class NavState
@@ -272,6 +272,7 @@ namespace User.TeamPace
         private void BtnTabCareer_Click(object sender, RoutedEventArgs e)   { OpenTab(Screen.Career, "Carrière"); }
         private void BtnTabHistory_Click(object sender, RoutedEventArgs e)  { OpenTab(Screen.History, "Historique"); }
         private void BtnTabStrategy_Click(object sender, RoutedEventArgs e) { OpenTab(Screen.Strategy, "Stratégie"); }
+        private void BtnTabOverlay_Click(object sender, RoutedEventArgs e)  { OpenTab(Screen.Overlay, "Overlay"); }
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
@@ -376,6 +377,7 @@ namespace User.TeamPace
             SetTabActive(BtnTabCareer,   rootScreen == Screen.Career || rootScreen == Screen.Circuit);
             SetTabActive(BtnTabHistory,  rootScreen == Screen.History || rootScreen == Screen.Analysis);
             SetTabActive(BtnTabStrategy, rootScreen == Screen.Strategy);
+            SetTabActive(BtnTabOverlay,  rootScreen == Screen.Overlay);
 
             ClassFilterBar.Visibility     = _state.Screen == Screen.Career ? Visibility.Visible : Visibility.Collapsed;
             CircuitTabs.Visibility        = _state.Screen == Screen.Circuit ? Visibility.Visible : Visibility.Collapsed;
@@ -391,6 +393,10 @@ namespace User.TeamPace
                 case Screen.Career:   RenderCareer();   break;
                 case Screen.History:  RenderHistory();  break;
                 case Screen.Strategy: RenderStrategy(); break;
+                case Screen.Overlay:
+                    SetHeader("Overlay", null, null);
+                    Fill(new OverlaySettingsView(_drivers));
+                    break;
                 case Screen.Circuit:  RenderCircuit();  break;
                 case Screen.Analysis: RenderAnalysis(); break;
             }
@@ -860,6 +866,9 @@ namespace User.TeamPace
                 case Screen.Strategy:
                     return "Préparation : l'énergie d'abord, le plein à chaque arrêt et le complément au dernier. Glissez un arrêt (carré jaune) pour le déplacer ; glissez un pilote sur un relais, ou cliquez le relais. Chaque arrêt se règle sur sa carte : le niveau d'énergie voulu à la sortie des stands et les pneus.\n" +
                            "Analyse de course : une course réelle face au plan, puis toutes les voitures. Données mesurées : une valeur saisie passe en jaune ; effacez-la pour revenir à la mesure.";
+                case Screen.Overlay:
+                    return "Un seul overlay, discret, au-dessus du jeu : quatre pages (Télémétrie, Coaching, Course, Plan de travail) qu'on fait défiler avec les boutons du volant. Mappez les actions TeamPace dans SimHub › Contrôles et événements.\n" +
+                           "« Placer l'overlay » le montre à l'écran : glissez-le, la molette change sa taille. Le jeu doit être en fenêtré ou en plein écran fenêtré.";
                 case Screen.Analysis:
                     if (_state.RaceTab)
                         return "Prévu / réel : le plan de l'équipe pour ce circuit face à la course ; un arrêt réel est aussi large que le temps qu'il a coûté. Les arrêts des autres voitures sont repérés au temps perdu (40 s ou plus) : LMU n'écrit ni leur énergie ni leurs pneus.\n" +
