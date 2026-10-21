@@ -10,10 +10,15 @@ namespace User.TeamPace
     /// The overlay, drawn by hand at 760 × 150 (scaled by its host): one page at a time, chosen
     /// with the wheel buttons. Everything comes from <see cref="OverlayService"/>.
     /// </summary>
-    internal class OverlayView : FrameworkElement
+    /// <summary>What the overlay window shows: the overlay or the pitwall.</summary>
+    internal abstract class OverlayCanvas : FrameworkElement
+    {
+        public bool EditMode;
+    }
+
+    internal class OverlayView : OverlayCanvas
     {
         public const double W = OverlaySettings.BaseWidth, H = OverlaySettings.BaseHeight;
-        public bool EditMode;
 
         private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
         private static readonly Typeface Reg = new Typeface(new FontFamily("Bahnschrift, Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.SemiCondensed);
@@ -320,16 +325,18 @@ namespace User.TeamPace
             }
             int done = OverlayService.Lap - 1;
             StrategyEngine.StopPlan stop = null;
-            int number = 0, first = 1;
+            int number = 0, planLap = 0;
             if (!demo)
             {
-                first = race.Sim.FirstStop;
-                int j = race.Sim.Stops.FindIndex(st => st.Lap > done);
+                var sim = OverlayService.LiveSim ?? race.Sim;   // recalculated at each lap once the race runs
+                int j = sim.Stops.FindIndex(st => st.Lap > done);
                 if (j >= 0)
                 {
-                    j = Math.Min(race.Sim.Stops.Count - 1, j + OverlayService.StopView);
-                    stop = race.Sim.Stops[j];
-                    number = j + first;
+                    j = Math.Min(sim.Stops.Count - 1, j + OverlayService.StopView);
+                    stop = sim.Stops[j];
+                    number = j + sim.FirstStop;
+                    int b = number - race.Sim.FirstStop;
+                    if (sim != race.Sim && b >= 0 && b < race.Sim.Stops.Count) planLap = race.Sim.Stops[b].Lap;
                 }
             }
             double colW = (W - 24) / 4;
@@ -342,7 +349,8 @@ namespace User.TeamPace
                 T(dc, "ARRÊT " + (demo ? 3 : number) + " DANS", 12, 40, 11, Muted);
                 double w = T(dc, toGo.ToString(), 12, 54, 38, Text, true);
                 T(dc, toGo > 1 ? "tours" : "tour", 18 + w, 72, 16, Muted);
-                T(dc, demo ? "au T29 · vers 1h23" : string.Format("au T{0} · vers {1}", stop.Lap, Clock(stop.At)), 12, 104, 12.5, Muted);
+                T(dc, demo ? "au T29 · vers 1h23" : planLap > 0 && planLap != stop.Lap ? string.Format("au T{0} · plan T{1}", stop.Lap, planLap)
+                                                                                       : string.Format("au T{0} · vers {1}", stop.Lap, Clock(stop.At)), 12, 104, 12.5, planLap > 0 && planLap != stop.Lap ? Amber : Muted);
             }
             else
             {
@@ -353,7 +361,7 @@ namespace User.TeamPace
             // 2. Fuel and its margin
             double x = 12 + colW + 12;
             double tank = demo ? 100 : Math.Max(1, race.Plan.TankL);
-            double perLap = demo ? 3.9 : race.FuelPerLap;
+            double perLap = demo ? 3.9 : !double.IsNaN(OverlayService.LiveFuel) ? OverlayService.LiveFuel : race.FuelPerLap;
             T(dc, "ESSENCE", x, 40, 11, Muted);
             T(dc, OverlayService.Fuel.ToString("0", Fr) + " L", x, 54, 24, Text, true);
             double bw = colW - 24;

@@ -390,8 +390,12 @@ du rétroviseur central. Il a quatre pages, qu'on fait défiler avec les boutons
    référence, avec un trait blanc sur votre freinage précédent ; après, le bilan du passage
    (temps gagné ou perdu, point de freinage, vitesse mini) et vos derniers passages. En option,
    la consigne est **lue à voix haute** dans la ligne droite d'avant.
-3. **Course** : le plan de stratégie suivi en direct : tours avant le prochain arrêt, essence et
-   marge, écart avec le plan, et à l'arrêt le pilote qui prend le relais, le niveau et les pneus.
+3. **Course** : le plan de stratégie **recalculé à chaque fin de tour** : tours avant le prochain
+   arrêt, essence et marge, écart avec le plan, et à l'arrêt le pilote qui prend le relais, le
+   niveau et les pneus. Le recalcul repart de la course telle qu'elle est (temps restant, essence,
+   arrêts faits, temps déjà roulé dans le relais) avec le rythme et la consommation mesurés depuis
+   le départ (médiane des 10 derniers tours, sans les passages au stand) ; un arrêt fixé à la main
+   que le réservoir ne permet plus d'atteindre avance. Le plan d'origine reste affiché à côté.
 4. **Plan de travail** : la séance en cours, virage par virage (votre écart au premier passage,
    puis au dernier), et votre meilleur tour face à la référence.
 
@@ -416,6 +420,17 @@ configurer » puis appuyez sur le bouton à associer, comme partout dans SimHub 
 | D | masquer ou afficher |
 
 (Ce sont les actions `TeamPacePlugin.Overlay.*` de SimHub › *Contrôles et événements*.)
+
+### Pitwall
+
+Pour le coéquipier qui suit la course dans la session pendant qu'un autre roule : sur **son**
+PC, son SimHub lit la voiture qu'il regarde, sans lien entre les ordinateurs. Le pitwall (une
+fenêtre plus grande, à cocher et placer dans la section *Pitwall* de l'onglet Overlay) montre le
+relais en cours, l'essence et sa marge, le **prochain arrêt recalculé** et **ce qu'il faut régler
+dans le menu des stands** : pilote, niveau d'énergie (et l'essence correspondante), pneus. Puis les
+arrêts suivants et les derniers tours, comparés au rythme prévu.
+
+![Le pitwall](docs/images/18-pitwall.png)
 
 Le jeu doit être en fenêtré ou en plein écran fenêtré (comme pour les overlays de SimHub). La
 référence se calcule à partir de la télémétrie de l'équipe : il faut des tours propres extraits

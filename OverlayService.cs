@@ -14,6 +14,7 @@ namespace User.TeamPace
     {
         public StrategyPlan Plan;
         public StrategyEngine.Simulation Sim;
+        public StrategyEngine.Measures Measures;
         public double FuelPerLap = double.NaN;
         public string Error;
 
@@ -29,11 +30,61 @@ namespace User.TeamPace
             foreach (var td in LmuTeamSync.GetDrivers()) drivers.Add(new DriverView(td, DriverView.Palette[k++ % DriverView.Palette.Length]));
             var m = StrategyEngine.Measure(drivers, r.Plan.Circuit, r.Plan.ClassLabel, r.Plan.TankL);
             StrategyEngine.ApplyOverrides(m, r.Plan);
+            r.Measures = m;
             r.Sim = StrategyEngine.Simulate(r.Plan, m, false);
             var me = m.Drivers.Find(d => d.Driver.DbPath == null);
             if (me != null && me.Values[StrategyEngine.Fuel].Value > 0) r.FuelPerLap = me.Values[StrategyEngine.Fuel].Value;
             if (r.Sim.Stints.Count == 0) r.Error = r.Sim.Warnings.Count > 0 ? r.Sim.Warnings[0] : "Plan incomplet";
             return r;
+        }
+
+        /// <summary>The plan's driver of a stint.</summary>
+        public string DriverOf(int stint)
+        {
+            if (Plan == null || Measures == null) return null;
+            var keys = Plan.Drivers.FindAll(k => Measures.Drivers.Exists(d => d.Driver.Name == k));
+            return keys.Count > 0 ? StrategyEngine.DriverOf(Plan, keys, stint) : null;
+        }
+
+        /// <summary>The plan's pace of a driver, s.</summary>
+        public double PaceOf(string driver)
+        {
+            var d = Measures != null ? Measures.Drivers.Find(x => x.Driver.Name == driver) : null;
+            return d != null ? d.Values[StrategyEngine.Pace].Value : double.NaN;
+        }
+
+        /// <summary>Tyres used by the plan once a number of race stops are made (the qualifying's included).</summary>
+        public int TyresUsedAfter(int stops)
+        {
+            int n = Sim.Quali != null ? Sim.Quali.Stop0.Tyres + Sim.Quali.Stop1.Tyres : 4;
+            for (int i = 0; i < stops && i < Sim.Stops.Count; i++) n += Sim.Stops[i].Tyres;
+            return n;
+        }
+
+        /// <summary>The measures with what the race shows so far for the driver in the car: pace and consumption.</summary>
+        public StrategyEngine.Measures LiveMeasures(double pace, double fuel, int stint)
+        {
+            var m = new StrategyEngine.Measures { Team = Measures.Team, CornerShare = Measures.CornerShare };
+            string current = DriverOf(stint);
+            foreach (var d in Measures.Drivers)
+            {
+                var dd = new StrategyEngine.DriverData { Driver = d.Driver };
+                foreach (var kv in d.Values)
+                    dd.Values[kv.Key] = new StrategyValue { Value = kv.Value.Value, Measured = kv.Value.Measured, Overridden = kv.Value.Overridden, Source = kv.Value.Source };
+                if (d.Driver.Name == current)
+                {
+                    if (!double.IsNaN(pace)) dd.Values[StrategyEngine.Pace].Value = pace;
+                    if (!double.IsNaN(fuel))
+                    {
+                        // The virtual energy goes with the fuel actually burnt
+                        double old = dd.Values[StrategyEngine.Fuel].Value;
+                        dd.Values[StrategyEngine.Fuel].Value = fuel;
+                        if (old > 0 && dd.Values[StrategyEngine.Energy].Value > 0) dd.Values[StrategyEngine.Energy].Value *= fuel / old;
+                    }
+                }
+                m.Drivers.Add(dd);
+            }
+            return m;
         }
 
         /// <summary>Race time at the end of a lap, according to the plan (stops included).</summary>
@@ -69,6 +120,28 @@ namespace User.TeamPace
         public static double ApproachLeft, NextIn;
         public static double SessionFirst = double.NaN, SessionBest = double.NaN, PlanGap = double.NaN;
         public static int StopView;
+
+        // The race as it goes: the plan recalculated at the end of each lap from where the race stands
+        public static volatile StrategyEngine.Simulation LiveSim;
+        public static int LiveLap = -1, RaceStops, StintLaps;
+        public static double LivePace = double.NaN, LiveFuel = double.NaN, StintStart;
+        public static double[] RecentLaps = new double[0];   // the last laps of the race, s (a fresh array each lap: safe to read)
+        private static readonly List<double> RaceLaps = new List<double>(), RaceFuel = new List<double>();
+        private static bool _inLane, _pitThisLap, _wasRace;
+        private static double _lapStartFuel = -1;
+        private static int _tyreLap;
+
+        /// <summary>Race time from the time left in a timed race; NaN when unknown.</summary>
+        public static double RaceTime
+        {
+            get
+            {
+                var race = _race;
+                if (race == null || race.Plan == null || !(SessionLeft > 0)) return double.NaN;
+                double t = race.Plan.DurationMin * 60.0 - SessionLeft;
+                return t >= 0 ? t : double.NaN;
+            }
+        }
         public static bool Demo;   // preview with made-up values (game not running)
 
         // The last seconds of inputs: yours and the reference's at the same place on track
@@ -103,7 +176,7 @@ namespace User.TeamPace
         private static double _prevDist, _prevT;
         private static int _sector = -1;
         private static OverlayFocus _pending;
-        private static readonly List<CoachingEngine.Lap> LiveLap = new List<CoachingEngine.Lap> { new CoachingEngine.Lap() };
+        private static readonly List<CoachingEngine.Lap> LivePass = new List<CoachingEngine.Lap> { new CoachingEngine.Lap() };
 
         public static void Update(GameData data)
         {
@@ -113,7 +186,7 @@ namespace User.TeamPace
             _lastFrame = Now;
             Demo = false;
             var s = OverlaySettings.Current;
-            if (!s.Enabled && !EditMode) return;   // nothing computed while the overlay is off
+            if (!s.Enabled && !s.PitwallEnabled && !EditMode && !PitEditMode) return;   // nothing computed while both are off
 
             var track = d.TrackName ?? "";
             var cls = d.CarClass ?? "";
@@ -127,6 +200,21 @@ namespace User.TeamPace
             Fuel = d.Fuel;
             SessionLeft = d.SessionTimeLeft.TotalSeconds;
             IsRace = d.SessionTypeName != null && d.SessionTypeName.IndexOf("race", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (IsRace != _wasRace) { _wasRace = IsRace; ResetRace(); }
+            // Pit stops of the race: counted at the lane entry, the stint restarts at the exit
+            bool lane = d.IsInPitLane != 0;
+            if (IsRace && lane && !_inLane && d.SpeedKmh > 5)
+            {
+                var live = LiveSim;
+                var race = _race;
+                int wheels = live != null && live.Stops.Count > 0 ? live.Stops[0].Wheels
+                           : race != null && race.Sim != null && RaceStops < race.Sim.Stops.Count ? race.Sim.Stops[RaceStops].Wheels : 0;
+                RaceStops++;
+                _pitThisLap = true;
+                if (wheels != 0) _tyreLap = d.CompletedLaps;
+            }
+            if (IsRace && !lane && _inLane) { StintStart = RaceTime; StintLaps = 0; }
+            _inLane = lane;
             Feed(d.TrackPositionMeters, d.TrackPositionPercent, d.CurrentLapTime.TotalSeconds, d.LastLapTime.TotalSeconds, d.CompletedLaps,
                  d.Throttle, d.Brake, d.SpeedKmh, d.Gear ?? "", s);
         }
@@ -174,8 +262,16 @@ namespace User.TeamPace
             if (Count < Cap) Count++;
         }
 
+        private static void ResetRace()
+        {
+            RaceLaps.Clear(); RaceFuel.Clear(); RecentLaps = new double[0];
+            RaceStops = 0; StintLaps = 0; StintStart = 0; _tyreLap = 0; _lapStartFuel = -1; _pitThisLap = false;
+            LiveSim = null; LiveLap = -1; LivePace = LiveFuel = double.NaN;
+        }
+
         private static void ResetSession()
         {
+            ResetRace();
             _completed = -1;
             _curFirst = _curLast = _lastFirst = _lastLast = -1;
             _fromLine = false;
@@ -302,8 +398,8 @@ namespace User.TeamPace
                 // Still in the corner's exit: wait; the lap was cut (pits, reset): give up
                 return !(_curFirst >= 0 && _curFirst <= ia && _curLast < need);
             }
-            LiveLap[0].Trace = t;
-            var passes = CoachingEngine.Passes(LiveLap, f.Corner, f.A, Math.Min(f.B, t.DistAt(t.N - 1)));
+            LivePass[0].Trace = t;
+            var passes = CoachingEngine.Passes(LivePass, f.Corner, f.A, Math.Min(f.B, t.DistAt(t.N - 1)));
             if (passes.Count == 0) return true;
             var p = passes[0];
             if (!(p.Sector > 0) || p.Sector > f.RefSector * 1.5) return true;   // a spin, a recording gap
@@ -321,6 +417,20 @@ namespace User.TeamPace
                 if (double.IsNaN(SessionFirst)) SessionFirst = lapSec;
                 if (double.IsNaN(SessionBest) || lapSec < SessionBest) SessionBest = lapSec;
             }
+            if (IsRace)
+            {
+                // What the race shows: lap times and fuel burnt, without the laps through the pits
+                if (lapSec > 0 && !_pitThisLap) RaceLaps.Add(lapSec);
+                if (_lapStartFuel >= 0 && !_pitThisLap && _lapStartFuel - Fuel > 0.05) RaceFuel.Add(_lapStartFuel - Fuel);
+                _lapStartFuel = Fuel;
+                _pitThisLap = false;
+                StintLaps++;
+                int k = Math.Min(8, RaceLaps.Count);
+                var recent = new double[k];
+                for (int i = 0; i < k; i++) recent[i] = RaceLaps[RaceLaps.Count - k + i];
+                RecentLaps = recent;
+                Replan(completed);
+            }
             var race = _race;
             if (IsRace && race != null && race.Plan != null)
             {
@@ -329,6 +439,43 @@ namespace User.TeamPace
                 double planned = race.PlanTimeAt(completed);
                 PlanGap = SessionLeft > 0 && elapsed > 0 && !double.IsNaN(planned) ? elapsed - planned : double.NaN;
             }
+        }
+
+        /// <summary>The plan for the rest of the race, from where it stands (in the background).</summary>
+        private static void Replan(int completed)
+        {
+            var race = _race;
+            double time = RaceTime;
+            if (race == null || race.Sim == null || race.Measures == null || race.Sim.Stints.Count == 0 || double.IsNaN(time)) return;
+            var state = new StrategyEngine.RaceState
+            {
+                Time = time, Lap = completed, StopsDone = RaceStops, Fuel = Fuel,
+                StintTime = Math.Max(0, time - StintStart), LapsOnTyres = Math.Max(0, completed - _tyreLap),
+                TyresUsed = race.TyresUsedAfter(RaceStops),
+            };
+            double pace = Recent(RaceLaps, 10, 3), fuel = Recent(RaceFuel, 10, 2);
+            int stops = RaceStops;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var sim = StrategyEngine.Resume(race.Plan, race.LiveMeasures(pace, fuel, stops), state);
+                    if (sim.Stints.Count == 0) return;
+                    LivePace = pace; LiveFuel = fuel; LiveLap = completed;
+                    LiveSim = sim;
+                }
+                catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Live strategy: " + ex.Message); }
+            });
+        }
+
+        /// <summary>Median of the last values (a lap behind a slower car or a yellow flag weighs nothing); NaN when too few.</summary>
+        private static double Recent(List<double> v, int last, int min)
+        {
+            int n = Math.Min(last, v.Count);
+            if (n < min) return double.NaN;
+            var c = v.GetRange(v.Count - n, n);
+            c.Sort();
+            return c[n / 2];
         }
 
         // ─── Reference ────────────────────────────────────────────────────────
@@ -424,8 +571,8 @@ namespace User.TeamPace
 
         // ─── Wheel buttons ────────────────────────────────────────────────────
 
-        private static bool _hidden;
-        public static bool EditMode;
+        private static bool _hidden, _pitHidden;
+        public static bool EditMode, PitEditMode;
 
         public static void NextPage(int dir)
         {
@@ -462,9 +609,15 @@ namespace User.TeamPace
             Dispatch(Sync);
         }
 
+        public static void TogglePitwall()
+        {
+            _pitHidden = !_pitHidden;
+            Dispatch(Sync);
+        }
+
         // ─── Window ───────────────────────────────────────────────────────────
 
-        private static OverlayWindow _window;
+        private static OverlayWindow _window, _pitWindow;
         private static DispatcherTimer _watch;
 
         public static void Init(string dataDir)
@@ -489,18 +642,23 @@ namespace User.TeamPace
         private static void Sync()
         {
             var s = OverlaySettings.Current;
-            bool show = EditMode || (s.Enabled && !_hidden && Live);
             try
             {
-                if (show)
-                {
-                    if (_window == null) _window = new OverlayWindow();
-                    _window.Apply(s, EditMode);
-                    if (!_window.IsVisible) _window.Show();
-                }
-                else if (_window != null && _window.IsVisible) _window.Hide();
+                Show(ref _window, false, EditMode || (s.Enabled && !_hidden && Live), EditMode, s);
+                Show(ref _pitWindow, true, PitEditMode || (s.PitwallEnabled && !_pitHidden && Live), PitEditMode, s);
             }
             catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Overlay window: " + ex.Message); }
+        }
+
+        private static void Show(ref OverlayWindow w, bool pitwall, bool show, bool edit, OverlaySettings s)
+        {
+            if (show)
+            {
+                if (w == null) w = new OverlayWindow(pitwall);
+                w.Apply(s, edit);
+                if (!w.IsVisible) w.Show();
+            }
+            else if (w != null && w.IsVisible) w.Hide();
         }
 
         public static void SetEditMode(bool on)
@@ -510,9 +668,21 @@ namespace User.TeamPace
             Sync();
         }
 
+        public static void SetPitEditMode(bool on)
+        {
+            PitEditMode = on;
+            if (on && !Live) Demo = true;
+            Sync();
+        }
+
         public static void Shutdown()
         {
-            Dispatch(() => { if (_window != null) _window.Close(); _window = null; });
+            Dispatch(() =>
+            {
+                if (_window != null) _window.Close();
+                if (_pitWindow != null) _pitWindow.Close();
+                _window = _pitWindow = null;
+            });
         }
 
         // ─── Voice ────────────────────────────────────────────────────────────

@@ -15,13 +15,16 @@ namespace User.TeamPace
     /// </summary>
     internal class OverlayWindow : Window
     {
-        private readonly OverlayView _view = new OverlayView();
+        private readonly OverlayCanvas _view;
+        private readonly bool _pit;
         private readonly ScaleTransform _scale = new ScaleTransform(1, 1);
         private readonly DispatcherTimer _frame;
         private bool _edit, _clickThrough;
 
-        public OverlayWindow()
+        public OverlayWindow(bool pitwall)
         {
+            _pit = pitwall;
+            _view = pitwall ? (OverlayCanvas)new PitwallView() : new OverlayView();
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
@@ -30,7 +33,7 @@ namespace User.TeamPace
             ShowActivated = false;
             ResizeMode = ResizeMode.NoResize;
             SizeToContent = SizeToContent.WidthAndHeight;
-            Title = "TeamPace overlay";
+            Title = pitwall ? "TeamPace pitwall" : "TeamPace overlay";
             _view.LayoutTransform = _scale;
             Content = _view;
 
@@ -40,7 +43,9 @@ namespace User.TeamPace
             {
                 if (!_edit) return;
                 var st = OverlaySettings.Current;
-                st.Scale = Math.Max(0.4, Math.Min(3, st.Scale + (e.Delta > 0 ? 0.05 : -0.05)));
+                double step = e.Delta > 0 ? 0.05 : -0.05;
+                if (_pit) st.PitScale = Math.Max(0.4, Math.Min(3, st.PitScale + step));
+                else st.Scale = Math.Max(0.4, Math.Min(3, st.Scale + step));
                 OverlaySettings.Save();
             };
 
@@ -58,10 +63,13 @@ namespace User.TeamPace
         {
             _edit = edit;
             _view.EditMode = edit;
-            _scale.ScaleX = _scale.ScaleY = s.Scale;
-            if (double.IsNaN(s.Left)) s.Left = (SystemParameters.PrimaryScreenWidth - OverlaySettings.BaseWidth * s.Scale) / 2;
-            if (Math.Abs(Left - s.Left) > 0.5) Left = s.Left;
-            if (Math.Abs(Top - s.Top) > 0.5) Top = s.Top;
+            double scale = _pit ? s.PitScale : s.Scale;
+            _scale.ScaleX = _scale.ScaleY = scale;
+            if (_pit && double.IsNaN(s.PitLeft)) s.PitLeft = (SystemParameters.PrimaryScreenWidth - OverlaySettings.PitWidth * scale) / 2;
+            if (!_pit && double.IsNaN(s.Left)) s.Left = (SystemParameters.PrimaryScreenWidth - OverlaySettings.BaseWidth * scale) / 2;
+            double left = _pit ? s.PitLeft : s.Left, top = _pit ? s.PitTop : s.Top;
+            if (Math.Abs(Left - left) > 0.5) Left = left;
+            if (Math.Abs(Top - top) > 0.5) Top = top;
             Cursor = edit ? Cursors.SizeAll : null;
             SetClickThrough(!edit);
             Topmost = false; Topmost = true;   // back above the game if it took the front
@@ -70,7 +78,8 @@ namespace User.TeamPace
         private void Save()
         {
             var s = OverlaySettings.Current;
-            s.Left = Left; s.Top = Top;
+            if (_pit) { s.PitLeft = Left; s.PitTop = Top; }
+            else { s.Left = Left; s.Top = Top; }
             OverlaySettings.Save();
         }
 

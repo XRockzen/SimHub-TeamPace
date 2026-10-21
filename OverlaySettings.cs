@@ -9,6 +9,7 @@ namespace User.TeamPace
     public class OverlaySettings
     {
         public const double BaseWidth = 760, BaseHeight = 150;
+        public const double PitWidth = 900, PitHeight = 250;
 
         // Display
         public bool   Enabled  { get; set; }
@@ -37,6 +38,12 @@ namespace User.TeamPace
         // Race
         public string StrategyPlan { get; set; }      // null = the team's latest plan for the circuit
 
+        // Pitwall: for the teammate following the race in the session, on his own computer
+        public bool   PitwallEnabled { get; set; }
+        public double PitLeft        { get; set; }
+        public double PitTop         { get; set; }
+        public double PitScale       { get; set; }
+
         public static OverlaySettings Default()
         {
             return new OverlaySettings
@@ -45,6 +52,7 @@ namespace User.TeamPace
                 Pages = new[] { true, true, true, true }, Page = 0,
                 WindowSec = 8, Ghost = true,
                 Reference = "ideal", Voice = false, CoachCorners = 3, AnnounceMeters = 300,
+                PitwallEnabled = false, PitLeft = double.NaN, PitTop = 200, PitScale = 1,
             };
         }
 
@@ -53,6 +61,7 @@ namespace User.TeamPace
         {
             if (Pages == null || Pages.Length != 4) Pages = new[] { true, true, true, true };
             if (!(Scale >= 0.4 && Scale <= 3)) Scale = 1;
+            if (!(PitScale >= 0.4 && PitScale <= 3)) PitScale = 1;
             if (!(Opacity >= 0 && Opacity <= 1)) Opacity = 0.88;
             if (!(WindowSec >= 2 && WindowSec <= 30)) WindowSec = 8;
             if (string.IsNullOrEmpty(Reference)) Reference = "ideal";

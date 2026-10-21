@@ -3,6 +3,18 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.4.0
+
+- **Stratégie en direct** : en course, le plan est recalculé à chaque fin de tour à partir de la
+  course telle qu'elle est (temps restant, essence, arrêts faits, relais en cours) et du rythme et
+  de la consommation mesurés depuis le départ. Un arrêt fixé à la main que le réservoir ne permet
+  plus d'atteindre avance. La page Course de l'overlay suit ce plan recalculé et rappelle le plan
+  d'origine.
+- **Pitwall** : une seconde fenêtre pour le coéquipier qui suit la course dans la session : relais
+  en cours, essence et marge, prochain arrêt recalculé et ce qu'il faut régler dans le menu des
+  stands (pilote, énergie, pneus), arrêts suivants, derniers tours. Rien à relier entre les PC :
+  son SimHub lit la voiture qu'il regarde. Section *Pitwall* de l'onglet Overlay.
+
 ## 4.3.1
 
 - **Overlay** : les boutons du volant s'associent directement dans l'onglet Overlay, avec le

@@ -113,6 +113,7 @@
     <Compile Include="OverlayView.cs" />
     <Compile Include="OverlayWindow.cs" />
     <Compile Include="OverlaySettingsView.cs" />
+    <Compile Include="PitwallView.cs" />
     <Compile Include="StrategyView.cs" />
     <Compile Include="StrategyReview.cs" />
     <Compile Include="RaceReviewView.cs" />

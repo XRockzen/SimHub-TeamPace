@@ -41,6 +41,7 @@ namespace User.TeamPace
                 _timer.Stop();
                 OverlayService.StatusChanged -= status;
                 if (OverlayService.EditMode) OverlayService.SetEditMode(false);
+                if (OverlayService.PitEditMode) OverlayService.SetPitEditMode(false);
             };
             Build();
         }
@@ -92,6 +93,7 @@ namespace User.TeamPace
             wrap.Children.Add(Section("Coaching", Coaching()));
             wrap.Children.Add(Section("Course", Race()));
             wrap.Children.Add(Section("Boutons du volant", Buttons()));
+            wrap.Children.Add(Section("Pitwall : coéquipier spectateur", Pitwall()));
             _root.Children.Add(wrap);
             _building = false;
         }
@@ -270,6 +272,43 @@ namespace User.TeamPace
             }
             p.Children.Add(Note("Cliquez puis appuyez sur le bouton du volant à associer, comme partout dans SimHub. B dépend de la page : fantôme, voix, arrêt suivant, référence."));
             return p;
+        }
+
+        /// <summary>The pitwall, shown on the computer of the teammate who follows the race in the session.</summary>
+        private UIElement Pitwall()
+        {
+            var p = new StackPanel();
+            p.Children.Add(Note("Pour le coéquipier qui suit la course dans la session pendant qu'un autre roule : sur son PC, son SimHub lit la voiture qu'il regarde. Il voit le relais, l'essence, le prochain arrêt recalculé à chaque tour et ce qu'il faut régler dans le menu des stands."));
+            p.Children.Add(Check("Afficher le pitwall pendant la session", S.PitwallEnabled, v => { S.PitwallEnabled = v; Changed(false); }));
+            var place = Ui.Button(OverlayService.PitEditMode ? "Terminé" : "Placer le pitwall à l'écran");
+            place.Margin = new Thickness(0, 8, 0, 0);
+            place.HorizontalAlignment = HorizontalAlignment.Left;
+            place.Click += (s, e) =>
+            {
+                OverlayService.SetPitEditMode(!OverlayService.PitEditMode);
+                place.Content = OverlayService.PitEditMode ? "Terminé" : "Placer le pitwall à l'écran";
+            };
+            p.Children.Add(place);
+            p.Children.Add(SliderRow("Taille", 40, 300, S.PitScale * 100, v => string.Format("{0:0} %", v), v => { S.PitScale = v / 100; Changed(false); }));
+            p.Children.Add(ControlRow("P", "Pitwall.Afficher", "Masquer / afficher"));
+            p.Children.Add(Note("Il suit le plan de stratégie choisi dans la section Course."));
+            return p;
+        }
+
+        private static UIElement ControlRow(string key, string action, string label)
+        {
+            var line = new DockPanel { Margin = new Thickness(0, 6, 0, 0), MinHeight = 30 };
+            var k = Ui.T(key, 13, Ui.Amber, FontWeights.Bold);
+            k.Width = 20;
+            DockPanel.SetDock(k, Dock.Left);
+            line.Children.Add(k);
+            string name = typeof(TeamPacePlugin).Name + "." + action;   // SimHub names a plugin's actions after its class
+            FrameworkElement editor = null;
+            try { editor = new SimHub.Plugins.UI.ControlsEditor { ActionName = name, FriendlyName = label }; }
+            catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Controls editor: " + ex.Message); }
+            if (editor == null) editor = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Foreground = Ui.Text, Text = label + " : action « " + name + " » dans Contrôles et événements" };
+            line.Children.Add(editor);
+            return line;
         }
 
         // ─── Widgets ──────────────────────────────────────────────────────────

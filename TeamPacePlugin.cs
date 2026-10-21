@@ -71,6 +71,7 @@ namespace User.TeamPace
             this.AddAction("Overlay.PagePrecedente", (a, b) => OverlayService.NextPage(-1), (a, b) => { });
             this.AddAction("Overlay.Action", (a, b) => OverlayService.PageAction(), (a, b) => { });
             this.AddAction("Overlay.Afficher", (a, b) => OverlayService.ToggleVisible(), (a, b) => { });
+            this.AddAction("Pitwall.Afficher", (a, b) => OverlayService.TogglePitwall(), (a, b) => { });
             this.AttachDelegate("Overlay.Delta", () => OverlayService.Delta);
             this.AttachDelegate("Overlay.Page", () => OverlaySettings.PageName((OverlayPage)OverlaySettings.Current.Page));
 

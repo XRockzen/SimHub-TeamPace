@@ -392,8 +392,10 @@ namespace User.TeamPace
             public List<StopPlan> Stops = new List<StopPlan>();
             public PreRace Quali;         // null without a qualifying
             public double[] WearPerLap;   // each tyre, % per lap
-            /// <summary>Number shown for the first race stop: 2 after a qualifying (0 and 1 come before the race).</summary>
-            public int FirstStop { get { return Quali != null ? 2 : 1; } }
+            public bool HasQuali;         // the plan has a qualifying (stops 0 and 1)
+            public int StopsDone;         // race stops already made (live strategy)
+            /// <summary>Number shown for the first stop of the list: 2 after a qualifying (0 and 1 come before the race), more once stops are made.</summary>
+            public int FirstStop { get { return (HasQuali ? 2 : 1) + StopsDone; } }
             public int Laps;
             public double Finish;         // race time when the last lap is completed
             public double PitLoss;
@@ -410,6 +412,19 @@ namespace User.TeamPace
             public string Driver;
             public int Laps;
             public StopPlan Stop0 = new StopPlan(), Stop1 = new StopPlan();
+        }
+
+        /// <summary>Where a race stands, to plan the rest of it while it runs.</summary>
+        public class RaceState
+        {
+            public double Time;                    // race time, s
+            public int    Lap;                     // laps completed
+            public int    StopsDone;               // race stops made
+            public double Fuel;                    // litres in the tank
+            public double Energy = double.NaN;     // virtual energy %, NaN = from the fuel and the measured ratio
+            public double StintTime;               // time driven in the current stint, s
+            public int    LapsOnTyres;             // laps since the tyres were changed
+            public int    TyresUsed;
         }
 
         // ─── Wheels ───────────────────────────────────────────────────────────
@@ -478,10 +493,17 @@ namespace User.TeamPace
             // Energy first: every stint as long as the tank allows, a full refill at each stop
             // and only what the last stint needs at the last one; tyres last as long as they can.
             plan.Normalize();
-            return Run(plan, m, tyresEveryStop, 0);
+            return Run(plan, m, tyresEveryStop, 0, null);
         }
 
-        private static Simulation Run(StrategyPlan plan, Measures m, bool tyresEveryStop, int capLaps)
+        /// <summary>The rest of a race from where it stands: same rules, stops and settings of the plan still to come.</summary>
+        public static Simulation Resume(StrategyPlan plan, Measures m, RaceState from)
+        {
+            plan.Normalize();
+            return Run(plan, m, false, 0, from);
+        }
+
+        private static Simulation Run(StrategyPlan plan, Measures m, bool tyresEveryStop, int capLaps, RaceState from)
         {
             var sim = new Simulation();
             var keys = plan.Drivers.FindAll(k => m.Drivers.Exists(d => d.Driver.Name == k));
@@ -520,8 +542,9 @@ namespace User.TeamPace
             var wear = new double[4]; var age = new double[4];
             int lap = 0, stint = 0;
             sim.TyresUsed = 4;
+            sim.HasQuali = plan.QualiMin > 0;
 
-            if (plan.QualiMin > 0)
+            if (plan.QualiMin > 0 && from == null)
             {
                 // Stop 0: the qualifying tyres. They run the qualifying, then stop 1 puts the race tyres
                 var q = new PreRace { Driver = keys.Contains(plan.QualiDriver ?? "") ? plan.QualiDriver : keys[0] };
@@ -549,13 +572,31 @@ namespace User.TeamPace
                 sim.Quali = q;
             }
 
+            double stintDone = 0;
+            if (from != null)
+            {
+                // Live: the race so far is done; the tank, the tyres and the stint as they are
+                t = from.Time; lap = from.Lap; stint = from.StopsDone; sim.StopsDone = from.StopsDone;
+                fuelInTank = Math.Max(0, Math.Min(tank, from.Fuel));
+                var cur = m.Drivers.Find(d => d.Driver.Name == DriverOf(plan, keys, stint)).Values;
+                energy = !double.IsNaN(from.Energy) ? from.Energy
+                       : sim.EnergyMode && cur[Fuel].Value > 0 ? Math.Min(100, fuelInTank * cur[Energy].Value / cur[Fuel].Value) : 100;
+                for (int c = 0; c < 4; c++) { age[c] = from.LapsOnTyres; wear[c] = from.LapsOnTyres * sim.WearPerLap[c]; }
+                sim.TyresUsed = Math.Max(4, from.TyresUsed);
+                stintDone = from.StintTime;
+            }
+
             while (t < duration && stint < 200)
             {
                 var key = DriverOf(plan, keys, stint);
                 var p = m.Drivers.Find(d => d.Driver.Name == key).Values;
                 double pace = p[Pace].Value, fuel = p[Fuel].Value, ve = p[Energy].Value, deg = p[Degradation].Value;
                 int n = Limit(fuelInTank, energy, fuel, ve, pace, plan.MaxStintMin);
+                // The stint under way has already used part of the maximum stint time
+                if (stintDone > 0 && plan.MaxStintMin > 0) n = Math.Max(1, Math.Min(n, (int)Math.Floor((plan.MaxStintMin * 60 - stintDone) / pace)));
+                stintDone = 0;
                 int forced = ForcedStop(plan, stint, lap);
+                if (forced > 0 && from != null && forced - lap > n) forced = 0;   // live: a stop the tank cannot reach comes earlier
                 if (forced > 0)
                 {
                     // Stop moved by hand: the stint lasts until then, even past the tank
@@ -586,7 +627,7 @@ namespace User.TeamPace
                 if (capLaps > 0) next = Math.Min(next, capLaps + 1);   // fuel for the balanced stint, one lap spare
                 int nextForced = ForcedStop(plan, stint + 1, lap);
                 if (nextForced > 0) next = Math.Min(nextForced - lap, Math.Max(1, toFlag));
-                int stopIndex = sim.Stops.Count;
+                int stopIndex = sim.Stops.Count + sim.StopsDone;   // the plan's settings for this stop
                 double ratio = sim.EnergyMode ? nFuel / nVe : 0;   // litres per % of virtual energy
                 int fullStint = Limit(tank, 100, nFuel, nVe, nPace, plan.MaxStintMin);
                 double asked = stopIndex < plan.StopLevel.Count ? plan.StopLevel[stopIndex] : -1;
@@ -609,7 +650,7 @@ namespace User.TeamPace
                 int wheels = chosen ? plan.StopWheels[stopIndex] & AllWheels : tyresEveryStop ? AllWheels : AutoWheels(wear, sim.WearPerLap, next);
                 if (wheels != 0 && sim.TyresUsed + Count(wheels) > plan.TyresAvailable)
                 {
-                    sim.Warnings.Add(string.Format("Arrêt {0} : {1} demandé(s) mais plus assez de pneus neufs ({2} {3}).", stopIndex + sim.FirstStop, WheelsLabel(wheels),
+                    sim.Warnings.Add(string.Format("Arrêt {0} : {1} demandé(s) mais plus assez de pneus neufs ({2} {3}).", sim.Stops.Count + sim.FirstStop, WheelsLabel(wheels),
                         plan.TyresAvailable, sim.Quali != null ? "pour la qualif et la course" : "pour la course"));
                     if (!chosen) wheels = Afford(wheels, wear, plan.TyresAvailable - sim.TyresUsed);
                 }
