@@ -202,7 +202,7 @@ namespace User.TeamPace
                 foreach (var x in sim.Warnings) _body.Children.Add(Warning(x));
                 return;
             }
-            if (_selectedStop >= sim.Stops.Count) _selectedStop = -1;
+            if (_selectedStop >= sim.Stops.Count || (_selectedStop < -1 && sim.Quali == null)) _selectedStop = -1;
 
             _body.Children.Add(Kpis(sim));
             _body.Children.Add(Timeline(sim));
@@ -236,8 +236,15 @@ namespace User.TeamPace
                 _plan.DurationMin = h * 60 + m;
                 return _plan.DurationMin > 0;
             }, null, 70)));
+            wrap.Children.Add(Field("Qualif roulée (min)", Box(_plan.QualiMin > 0 ? _plan.QualiMin.ToString() : "", v =>
+            {
+                int n = 0;
+                if (v.Trim().Length > 0 && (!int.TryParse(v.Trim(), out n) || n < 0)) return false;
+                _plan.QualiMin = n;
+                return true;
+            }, "Temps passé en piste en qualif. Ses pneus (arrêt 0) s'usent pendant la qualif ;\nl'arrêt 1 met les pneus du départ de la course. Vide = pas de qualif.", 60)));
             wrap.Children.Add(Field("Départ", Box(_plan.StartClock ?? "", v => { _plan.StartClock = v.Trim(); return true; }, "ex. 20:00, pour afficher l'heure de chaque arrêt", 70)));
-            wrap.Children.Add(Field("Pneus pour la course", Box(_plan.TyresAvailable.ToString(), v => { int n; if (!int.TryParse(v, out n) || n < 4) return false; _plan.TyresAvailable = n; return true; }, "Nombre de pneus, ceux du départ compris (20 = 5 trains)", 60)));
+            wrap.Children.Add(Field("Pneus disponibles", Box(_plan.TyresAvailable.ToString(), v => { int n; if (!int.TryParse(v, out n) || n < 4) return false; _plan.TyresAvailable = n; return true; }, "Nombre de pneus pour la qualif et la course, ceux du départ compris (20 = 5 trains)", 60)));
             wrap.Children.Add(Field("Réservoir (L)", Box(_plan.TankL.ToString(Inv), v => { double n; if (!double.TryParse(v.Replace(',', '.'), NumberStyles.Float, Inv, out n) || n < 1) return false; _plan.TankL = n; return true; }, null, 60)));
             wrap.Children.Add(Field("Relais maxi (min)", Box(_plan.MaxStintMin > 0 ? _plan.MaxStintMin.ToString() : "", v => { int n = 0; if (v.Trim().Length > 0 && !int.TryParse(v, out n)) return false; _plan.MaxStintMin = n; return true; }, "vide = selon le réservoir et l'énergie", 60)));
             wrap.Children.Add(Field("Conduite mini / pilote (min)", Box(_plan.MinDriveMin > 0 ? _plan.MinDriveMin.ToString() : "", v => { int n = 0; if (v.Trim().Length > 0 && !int.TryParse(v, out n)) return false; _plan.MinDriveMin = n; return true; }, "vide = pas de règle", 60)));
@@ -333,14 +340,27 @@ namespace User.TeamPace
             var line = new Grid { Height = 66 };
             var blocks = new List<Block>();
             int firstLap = 1;
+            if (sim.Quali != null)
+            {
+                // Stop 0, the qualifying, stop 1: before the hours of the race
+                ticks.Margin = new Thickness(QualiWidth + 60, 0, 0, 3);
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+                line.Children.Add(PreMarker(sim, 0, 0));
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(QualiWidth) });
+                line.Children.Add(QualiBlock(sim, 1));
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+                line.Children.Add(PreMarker(sim, 1, 2));
+            }
             for (int i = 0; i < sim.Stints.Count; i++)
             {
                 var st = sim.Stints[i];
                 var d = _drivers.Find(x => x.Name == st.Driver);
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1, st.End - st.Start), GridUnitType.Star) });
                 var col = line.ColumnDefinitions.Count - 1;
-                bool fresh = i == 0 || sim.Stops[i - 1].Tyres == 4;
-                string tyres = i == 0 ? "pneus neufs" : sim.Stops[i - 1].Tyres == 4 ? "4 pneus neufs" : sim.Stops[i - 1].Tyres > 0 ? sim.Stops[i - 1].Tyres + " pneus neufs" : "mêmes pneus";
+                var before = i > 0 ? sim.Stops[i - 1] : sim.Quali != null ? sim.Quali.Stop1 : null;
+                string tyres = before == null ? "pneus neufs"
+                             : before.Wheels == 0 ? (i == 0 ? "pneus de la qualif" : "mêmes pneus")
+                             : StrategyEngine.WheelsLabel(before.Wheels) + (before.Tyres > 1 ? " neufs" : " neuf");
                 var text = new StackPanel { Margin = new Thickness(9, 6, 6, 6) };
                 text.Children.Add(Ui.T(d != null ? d.Name : st.Driver, 13.5, Brushes.White, FontWeights.Bold));
                 text.Children.Add(Ui.T(string.Format("T{0}–T{1} · {2}", firstLap, firstLap + st.Laps - 1, Fmt.TotalTime(TimeSpan.FromSeconds(st.End - st.Start))), 12, Brushes.White));
@@ -348,7 +368,7 @@ namespace User.TeamPace
                 var box = new Border
                 {
                     Background = d != null ? d.Brush : Brushes.Gray, Child = text, AllowDrop = true, ClipToBounds = true,
-                    CornerRadius = new CornerRadius(i == 0 ? 6 : 0, i == sim.Stints.Count - 1 ? 6 : 0, i == sim.Stints.Count - 1 ? 6 : 0, i == 0 ? 6 : 0),
+                    CornerRadius = new CornerRadius(i == 0 && sim.Quali == null ? 6 : 0, i == sim.Stints.Count - 1 ? 6 : 0, i == sim.Stints.Count - 1 ? 6 : 0, i == 0 && sim.Quali == null ? 6 : 0),
                     ToolTip = string.Format("Relais {0} : {1} tours, de {2} à {3}\nClic : choisir le pilote · ou glisser un pilote dessus", i + 1, st.Laps, Clock(st.Start), Clock(st.End)),
                     Cursor = Cursors.Hand,
                 };
@@ -390,6 +410,66 @@ namespace User.TeamPace
             return c;
         }
 
+        private const double QualiWidth = 150;
+
+        /// <summary>The qualifying on the timeline: its driver (click or drop one on it) and its laps.</summary>
+        private UIElement QualiBlock(StrategyEngine.Simulation sim, int col)
+        {
+            var q = sim.Quali;
+            var d = _drivers.Find(x => x.Name == q.Driver);
+            var text = new StackPanel { Margin = new Thickness(9, 6, 6, 6) };
+            text.Children.Add(Ui.T(d != null ? d.Name : q.Driver, 13.5, Brushes.White, FontWeights.Bold));
+            text.Children.Add(Ui.T(string.Format("Qualif · ≈ {0} tours", q.Laps), 12, Brushes.White));
+            text.Children.Add(Ui.T(q.Stop0.Wheels == StrategyEngine.AllWheels ? "pneus neufs" : StrategyEngine.WheelsLabel(q.Stop0.Wheels) + " neufs", 11.5, Ui.Frozen(Color.FromArgb(220, 255, 255, 255))));
+            var brush = d != null ? d.Brush : (SolidColorBrush)Brushes.Gray;
+            var box = new Border
+            {
+                Background = Ui.Tint(brush, 110),
+                Child = text, AllowDrop = true, ClipToBounds = true, CornerRadius = new CornerRadius(6, 0, 0, 6), Cursor = Cursors.Hand,
+                BorderBrush = brush, BorderThickness = new Thickness(1),
+                ToolTip = string.Format("Qualif : {0} min en piste, ≈ {1} tours\nL'usure de ces pneus est reportée sur le départ de la course (arrêt 1)\nClic : choisir le pilote · ou glisser un pilote dessus", _plan.QualiMin, q.Laps),
+            };
+            box.Drop += (s, e) =>
+            {
+                var name = e.Data.GetData(typeof(string)) as string;
+                if (name != null) { _plan.QualiDriver = name; Dispatcher.BeginInvoke(new Action(Rebuild)); }
+            };
+            box.MouseLeftButtonUp += (s, e) =>
+            {
+                var menu = new ContextMenu();
+                foreach (var k in _plan.Drivers)
+                {
+                    var dv = _drivers.Find(x => x.Name == k);
+                    if (dv == null) continue;
+                    var item = new MenuItem { Header = dv.Name, IsChecked = dv.Name == q.Driver };
+                    var nm = dv.Name;
+                    item.Click += (a, b) => { _plan.QualiDriver = nm; Dispatcher.BeginInvoke(new Action(Rebuild)); };
+                    menu.Items.Add(item);
+                }
+                menu.PlacementTarget = box;
+                menu.IsOpen = true;
+            };
+            Grid.SetColumn(box, col);
+            return box;
+        }
+
+        /// <summary>Stop 0 (before the qualifying) or 1 (before the race): click to set its tyres.</summary>
+        private UIElement PreMarker(StrategyEngine.Simulation sim, int number, int col)
+        {
+            bool selected = _selectedStop == -10 - number;
+            var marker = new Border
+            {
+                Background = selected ? StopBrush : Ui.Frozen(Color.FromRgb(0x1B, 0x1C, 0x20)), BorderBrush = StopBrush,
+                BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(4), Cursor = Cursors.Hand,
+                Child = new TextBlock { Text = number.ToString(), FontWeight = FontWeights.Bold, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                                        Foreground = selected ? Ui.Frozen(Color.FromRgb(0x22, 0x23, 0x28)) : StopBrush },
+                ToolTip = number == 0 ? "Arrêt 0 · pneus de la qualif\nClic pour le régler" : "Arrêt 1 · pneus du départ de la course\nClic pour le régler",
+            };
+            marker.MouseLeftButtonUp += (s, e) => { _selectedStop = -10 - number; Dispatcher.BeginInvoke(new Action(Rebuild)); e.Handled = true; };
+            Grid.SetColumn(marker, col);
+            return marker;
+        }
+
         private void SetDriver(StrategyEngine.Simulation sim, int stint, string name)
         {
             var list = new List<string>();
@@ -404,13 +484,13 @@ namespace User.TeamPace
         {
             var stop = sim.Stops[index];
             bool selected = index == _selectedStop;
-            var label = new TextBlock { Text = (index + 1).ToString(), FontWeight = FontWeights.Bold, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            var label = new TextBlock { Text = (index + sim.FirstStop).ToString(), FontWeight = FontWeights.Bold, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                                         Foreground = selected ? Ui.Frozen(Color.FromRgb(0x22, 0x23, 0x28)) : StopBrush };
             var marker = new Border
             {
                 Background = selected ? StopBrush : Ui.Frozen(Color.FromRgb(0x1B, 0x1C, 0x20)), BorderBrush = StopBrush,
                 BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(4), Child = label, Cursor = Cursors.SizeWE,
-                ToolTip = string.Format(Inv, "Arrêt {0} · T{1} · {2}{3}\nGlisser pour le déplacer · clic pour le régler", index + 1, stop.Lap, Clock(stop.At), stop.LapChosen ? " · déplacé à la main" : ""),
+                ToolTip = string.Format(Inv, "Arrêt {0} · T{1} · {2}{3}\nGlisser pour le déplacer · clic pour le régler", index + sim.FirstStop, stop.Lap, Clock(stop.At), stop.LapChosen ? " · déplacé à la main" : ""),
             };
             Grid.SetColumn(marker, col);
 
@@ -468,10 +548,45 @@ namespace User.TeamPace
 
         private UIElement StopCards(StrategyEngine.Simulation sim)
         {
-            if (sim.Stops.Count == 0) return Ui.T("Aucun arrêt nécessaire.", 13, Ui.Muted);
-            var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Min(4, sim.Stops.Count) };
+            int pre = sim.Quali != null ? 2 : 0;
+            if (sim.Stops.Count + pre == 0) return Ui.T("Aucun arrêt nécessaire.", 13, Ui.Muted);
+            var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Min(4, sim.Stops.Count + pre) };
+            for (int n = 0; n < pre; n++) grid.Children.Add(PreCard(sim, n));
             for (int i = 0; i < sim.Stops.Count; i++) grid.Children.Add(StopCard(sim, i));
             return grid;
+        }
+
+        /// <summary>Stop 0 (the qualifying tyres) or stop 1 (the tyres the race starts on).</summary>
+        private UIElement PreCard(StrategyEngine.Simulation sim, int n)
+        {
+            var q = sim.Quali;
+            var s = n == 0 ? q.Stop0 : q.Stop1;
+            var p = new StackPanel();
+            var head = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var when = Ui.T(n == 0 ? "avant la qualif" : "avant la course", 12.5, Ui.Muted);
+            DockPanel.SetDock(when, Dock.Right);
+            head.Children.Add(when);
+            head.Children.Add(Ui.T("Arrêt " + n, 15, Ui.Text, FontWeights.Bold));
+            p.Children.Add(head);
+            p.Children.Add(Line("Pneus", TyrePicker(s, n == 1, w =>
+            {
+                if (n == 0) _plan.QualiWheels = w; else _plan.GridWheels = w;
+                Dispatcher.BeginInvoke(new Action(Rebuild));
+            })));
+            var d = _drivers.Find(x => x.Name == s.NextDriver);
+            var who = Ui.T(n == 0 ? string.Format("{0} · ≈ {1} tours", s.NextDriver, q.Laps) : s.NextDriver, 13, d != null ? Ui.Light(d.Brush) : Ui.Text, FontWeights.SemiBold);
+            p.Children.Add(Line(n == 0 ? "Qualif" : "Départ", who));
+            if (n == 1) p.Children.Add(Line(sim.EnergyMode ? "Énergie" : "Essence", Ui.T(sim.EnergyMode ? "100 % au départ" : "plein au départ", 13, Ui.Text)));
+            var foot = Ui.T(n == 0 ? (s.Tyres > 0 ? string.Format("{0} pneu{1} du stock", s.Tyres, s.Tyres > 1 ? "s" : "") : "aucun pneu du stock")
+                                   : string.Format(Inv, "usure en fin de qualif : {0:0} % au plus", s.WearIn.Max()), 12.5, Ui.Muted);
+            p.Children.Add(new Border { BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 1, 0, 0), Child = foot, Margin = new Thickness(0, 4, 0, 0), Padding = new Thickness(0, 6, 0, 0) });
+            var card = new Border
+            {
+                Background = Ui.Panel, CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 10, 10), Child = p,
+                BorderBrush = _selectedStop == -10 - n ? StopBrush : Brushes.Transparent, BorderThickness = new Thickness(1),
+            };
+            card.MouseLeftButtonDown += (snd, e) => { if (_selectedStop != -10 - n) { _selectedStop = -10 - n; Dispatcher.BeginInvoke(new Action(Rebuild)); } };
+            return card;
         }
 
         private UIElement StopCard(StrategyEngine.Simulation sim, int i)
@@ -483,11 +598,18 @@ namespace User.TeamPace
             var when = Ui.T(Clock(s.At), 12.5, Ui.Muted);
             DockPanel.SetDock(when, Dock.Right);
             head.Children.Add(when);
-            head.Children.Add(Ui.T(string.Format("Arrêt {0} · T{1}", i + 1, s.Lap), 15, Ui.Text, FontWeights.Bold));
+            head.Children.Add(Ui.T(string.Format("Arrêt {0} · T{1}", i + sim.FirstStop, s.Lap), 15, Ui.Text, FontWeights.Bold));
             p.Children.Add(head);
 
             p.Children.Add(Line(sim.EnergyMode ? "Énergie" : "Essence", LevelBox(i, s, last, sim.EnergyMode)));
-            p.Children.Add(Line("Pneus", TyreButtons(i, s)));
+            p.Children.Add(Line("Pneus", TyrePicker(s, true, w =>
+            {
+                while (_plan.StopWheels.Count <= i) _plan.StopWheels.Add(-1);
+                while (_plan.StopTyres.Count <= i) _plan.StopTyres.Add(-1);
+                _plan.StopWheels[i] = w;
+                _plan.StopTyres[i] = w < 0 ? -1 : StrategyEngine.Count(w);   // read by older versions
+                Dispatcher.BeginInvoke(new Action(Rebuild));
+            })));
             var prev = i < sim.Stints.Count ? sim.Stints[i].Driver : "";
             var next = _drivers.Find(x => x.Name == s.NextDriver);
             var relay = new TextBlock { FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
@@ -539,31 +661,80 @@ namespace User.TeamPace
             return d;
         }
 
-        /// <summary>Tyres changed at a stop: auto, or 0, 2, 4 (1 and 3 from the menu).</summary>
-        private FrameworkElement TyreButtons(int stop, StrategyEngine.StopPlan s)
+        private static readonly string[] WheelNames = { "Avant gauche", "Avant droit", "Arrière gauche", "Arrière droit" };
+        private static readonly Brush NewTyre = Ui.Frozen(Color.FromRgb(0x42, 0xA5, 0xF5));
+
+        /// <summary>
+        /// The car seen from above: each tyre coloured by what is left of it when the car comes
+        /// in; a click changes it or keeps it (blue = new tyre). "auto" goes back to the automatic
+        /// choice: an axle is changed when one of its tyres would pass the limit in the next stint.
+        /// </summary>
+        private FrameworkElement TyrePicker(StrategyEngine.StopPlan s, bool showWear, Action<int> set)
         {
-            var row = new StackPanel { Orientation = Orientation.Horizontal };
-            Action<int> set = n =>
+            var panel = new StackPanel();
+            var g = new Grid { HorizontalAlignment = HorizontalAlignment.Center };
+            foreach (var w in new[] { 40.0, 8, 24, 8, 40 }) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
+            foreach (var h in new[] { 22.0, 8, 22 }) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(h) });
+            var body = new Border { CornerRadius = new CornerRadius(8, 8, 5, 5), Background = Ui.Frozen(Color.FromArgb(20, 255, 255, 255)),
+                                    BorderBrush = Ui.Frozen(Color.FromArgb(51, 255, 255, 255)), BorderThickness = new Thickness(1), Margin = new Thickness(0, -2, 0, -2) };
+            Grid.SetColumn(body, 2); Grid.SetRowSpan(body, 3);
+            g.Children.Add(body);
+            foreach (var row in new[] { 0, 2 })
             {
-                while (_plan.StopTyres.Count <= stop) _plan.StopTyres.Add(-1);
-                _plan.StopTyres[stop] = n;
-                Dispatcher.BeginInvoke(new Action(Rebuild));
-            };
-            foreach (var n in new[] { -1, 0, 2, 4 })
-            {
-                int value = n;
-                bool on = n == -1 ? !s.TyresChosen : s.TyresChosen && s.Tyres == n;
-                var b = Ui.SmallButton(n == -1 ? (s.TyresChosen ? "auto" : "auto · " + s.Tyres) : n.ToString(),
-                    n == -1 ? "Changés quand le train arrive en fin de vie" : n == 0 ? "Aucun pneu changé" : n + " pneus neufs");
-                b.Margin = new Thickness(3, 0, 0, 0);
-                b.MinWidth = 30;
-                Ui.SetOn(b, on);
-                b.Click += (snd, e) => set(value);
-                row.Children.Add(b);
+                var axle = new Border { Height = 2, Background = Ui.Frozen(Color.FromArgb(51, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(axle, 1); Grid.SetColumnSpan(axle, 3); Grid.SetRow(axle, row);
+                g.Children.Add(axle);
             }
-            if (s.TyresChosen && (s.Tyres == 1 || s.Tyres == 3))
-                row.Children.Add(Ui.T("  " + s.Tyres + " pneus", 12, Ui.Amber));
-            return row;
+            for (int c = 0; c < 4; c++)
+            {
+                int bit = 1 << c;
+                bool on = (s.Wheels & bit) != 0;
+                double worn = s.WearIn != null ? s.WearIn[c] : 0;
+                var color = WearColor(worn);
+                var tyre = new Border
+                {
+                    CornerRadius = new CornerRadius(3), Cursor = Cursors.Hand, Margin = new Thickness(on ? 0 : 1),
+                    Background = on ? NewTyre : new SolidColorBrush(Color.FromArgb(showWear ? (byte)230 : (byte)60, color.R, color.G, color.B)),
+                    BorderBrush = on ? Brushes.White : Brushes.Transparent, BorderThickness = new Thickness(on ? 1.5 : 0),
+                    ToolTip = string.Format(Inv, "{0}{1}\nClic : {2}", WheelNames[c],
+                        showWear ? string.Format(Inv, " · reste {0:0} % à l'arrivée (usé à {1:0} %)", 100 - worn, worn) : "",
+                        on ? "garder ce pneu" : "le changer"),
+                };
+                tyre.MouseLeftButtonDown += (snd, e) => { set(s.Wheels ^ bit); e.Handled = true; };
+                Grid.SetRow(tyre, c < 2 ? 0 : 2);
+                Grid.SetColumn(tyre, c % 2 == 0 ? 1 : 3);
+                g.Children.Add(tyre);
+                var label = Ui.T(on ? "neuf" : showWear ? string.Format(Inv, "{0:0} %", 100 - worn) : "—", 12, on ? NewTyre : showWear ? new SolidColorBrush(color) : Ui.Faint, on ? FontWeights.SemiBold : FontWeights.Normal);
+                label.VerticalAlignment = VerticalAlignment.Center;
+                label.HorizontalAlignment = c % 2 == 0 ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+                label.Margin = c % 2 == 0 ? new Thickness(0, 0, 6, 0) : new Thickness(6, 0, 0, 0);
+                Grid.SetRow(label, c < 2 ? 0 : 2);
+                Grid.SetColumn(label, c % 2 == 0 ? 0 : 4);
+                g.Children.Add(label);
+            }
+            panel.Children.Add(g);
+            var foot = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
+            foot.Children.Add(Ui.T(StrategyEngine.WheelsLabel(s.Wheels), 12, Ui.Text));
+            if (s.TyresChosen)
+            {
+                var reset = Ui.T("  · auto", 12, Ui.Link);
+                reset.Cursor = Cursors.Hand;
+                reset.ToolTip = "Revenir au choix automatique";
+                reset.MouseLeftButtonDown += (snd, e) => { set(-1); e.Handled = true; };
+                foot.Children.Add(reset);
+            }
+            else foot.Children.Add(Ui.T("  · auto", 12, Ui.Faint));
+            panel.Children.Add(foot);
+            return panel;
+        }
+
+        /// <summary>Green while the tyre is fresh, amber halfway to the limit, coral past it.</summary>
+        private static Color WearColor(double worn)
+        {
+            double k = Math.Max(0, Math.Min(1, worn / StrategyEngine.WearLimit));
+            var green = Color.FromRgb(0x4C, 0xAF, 0x7D); var amber = Color.FromRgb(0xF2, 0xB1, 0x3C); var coral = Color.FromRgb(0xEF, 0x6C, 0x5A);
+            Func<Color, Color, double, Color> mix = (a, b, t) => Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
+            return k < 0.5 ? mix(green, amber, k * 2) : mix(amber, coral, (k - 0.5) * 2);
         }
 
         /// <summary>

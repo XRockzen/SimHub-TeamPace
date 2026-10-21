@@ -3,6 +3,21 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.2.0
+
+**Stratégie : la qualif et le choix pneu par pneu.**
+
+- **Qualif roulée (min)** dans l'en-tête de la préparation. La frise commence alors avant la
+  course : **arrêt 0** (les pneus de la qualif), la barre de qualif avec son pilote et ses tours,
+  **arrêt 1** (les pneus du départ de la course), puis les arrêts de course numérotés à partir
+  de 2. L'usure de la qualif est reportée sur la course quand on part avec ces pneus, et ils
+  comptent dans les pneus disponibles.
+- **Choix des pneus sur une voiture vue de dessus** : chaque pneu montre ce qu'il lui reste en
+  arrivant au stand ; un clic le change ou le garde (avant, arrière, un côté, les 4, aucun).
+- L'usure est suivie **pneu par pneu**, d'après celle mesurée sur le circuit ; en automatique un
+  essieu est changé quand un de ses pneus arriverait en fin de vie.
+- **Télémétrie** : l'écart de chaque tour sur la référence dit « plus rapide » ou « plus lent ».
+
 ## 4.1.0
 
 Audit technique : justesse des calculs et charge de la machine.

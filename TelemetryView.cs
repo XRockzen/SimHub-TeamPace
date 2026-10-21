@@ -422,6 +422,12 @@ namespace User.TeamPace
                     {
                         Foreground = new SolidColorBrush(gap <= 0 ? Color.FromRgb(0x66, 0xBB, 0x6A) : Color.FromRgb(0xEF, 0x9A, 0x9A)),
                     });
+                    // Read from this lap's side: minus = faster than the reference
+                    info.Inlines.Add(new System.Windows.Documents.Run(Math.Abs(gap) < 0.0005 ? "  même temps" : gap < 0 ? "  plus rapide" : "  plus lent")
+                    {
+                        Foreground = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)),
+                    });
+                    info.ToolTip = string.Format(Inv, "Ce tour est {0:0.000} s {1} que la référence (1re ligne).\nVert = plus rapide qu'elle, rouge = plus lent.", Math.Abs(gap), gap < 0 ? "plus rapide" : "plus lent");
                 }
                 if (!string.IsNullOrEmpty(slot.Note))
                     info.Inlines.Add(new System.Windows.Documents.Run("   (" + slot.Note + ")") { Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)), FontStyle = FontStyles.Italic });
@@ -581,7 +587,7 @@ namespace User.TeamPace
             var others = _slots.FindAll(x => x != refSlot && x.Trace != null);
             _cornerPanel.Children.Add(new TextBlock
             {
-                Text = others.Count > 0 ? "Virages  ·  écart sur la référence" : "Virages  ·  temps de passage",
+                Text = others.Count > 0 ? "Virages  ·  écart sur la référence  (vert : plus rapide qu'elle)" : "Virages  ·  temps de passage",
                 FontSize = 12, Foreground = new SolidColorBrush(Color.FromArgb(166, 255, 255, 255)), Margin = new Thickness(0, 0, 0, 4),
             });
 

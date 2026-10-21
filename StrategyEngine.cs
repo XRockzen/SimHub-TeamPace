@@ -25,7 +25,13 @@ namespace User.TeamPace
         public List<double> StopFuel    { get; set; }   // refuel at each stop: virtual energy % (litres without it), -1 = automatic, Full = fill up
         public List<int>    StopLaps    { get; set; }   // lap of each stop moved by hand, -1 = where the tank says
         public List<double> StopLevel   { get; set; }   // level asked for when leaving each stop: virtual energy % (litres without it), -1 = automatic
+        public List<int>    StopWheels  { get; set; }   // wheels changed at each stop (FL 1, FR 2, RL 4, RR 8), -1 = automatic
         public int          TyresAvailable { get; set; } // single tyres for the race, the starting set included
+        // Qualifying before the race: its tyres are mounted at stop 0, the race tyres at stop 1
+        public int    QualiMin     { get; set; }   // time spent on track in qualifying, 0 = none
+        public string QualiDriver  { get; set; }
+        public int?   QualiWheels  { get; set; }   // stop 0, null = the 4 tyres
+        public int?   GridWheels   { get; set; }   // stop 1, null = automatic
         public List<StrategyOverride> Overrides { get; set; }
         public string   Author     { get; set; }   // last saved by
         public DateTime UpdatedUtc { get; set; }
@@ -48,6 +54,12 @@ namespace User.TeamPace
             if (Drivers == null) Drivers = new List<string>();
             if (StintDrivers == null) StintDrivers = new List<string>();
             if (StopTyres == null) StopTyres = new List<int>();
+            if (StopWheels == null)
+            {
+                // Older plans counted the tyres: 2 meant the fronts
+                StopWheels = new List<int>();
+                foreach (var n in StopTyres) StopWheels.Add(n < 0 ? -1 : StrategyEngine.WheelsOf(n));
+            }
             if (StopFuel == null) StopFuel = new List<double>();
             if (StopLaps == null) StopLaps = new List<int>();
             if (StopLevel == null)
@@ -137,6 +149,8 @@ namespace User.TeamPace
         {
             public List<DriverData> Drivers = new List<DriverData>();
             public Dictionary<string, StrategyValue> Team = new Dictionary<string, StrategyValue>();
+            /// <summary>Wear of each tyre (FL, FR, RL, RR) against the most worn one, measured here.</summary>
+            public double[] CornerShare = { 1, 1, 1, 1 };
         }
 
         private class Stop { public double Stopped, Fuel, Lane, Loss; public int Tyres; public bool Swap; }
@@ -145,6 +159,7 @@ namespace User.TeamPace
         {
             var m = new Measures();
             var stops = new List<Stop>();
+            var corners = new[] { new List<double>(), new List<double>(), new List<double>(), new List<double>() };
             var raceStops = new HashSet<string>();   // a race's stop counted once, whichever driver's data it comes from
             foreach (var d in drivers)
             {
@@ -183,13 +198,22 @@ namespace User.TeamPace
                         else if (l.FuelUsed > 0.002) fuel.Add(l.FuelUsed * tankL);
                         if (l.VirtualEnergyUsed > 0.002) ve.Add(l.VirtualEnergyUsed * 100);
                         double w = Math.Max(Math.Max(l.LiveWearFL, l.LiveWearFR), Math.Max(l.LiveWearRL, l.LiveWearRR));
-                        if (l.HasLive && w > 0.05) wear.Add(w);
+                        if (l.HasLive && w > 0.05)
+                        {
+                            wear.Add(w);
+                            corners[0].Add(l.LiveWearFL); corners[1].Add(l.LiveWearFR); corners[2].Add(l.LiveWearRL); corners[3].Add(l.LiveWearRR);
+                        }
                         else if (i > 0 && !laps[i - 1].IsPitLap)
                         {
                             var p = laps[i - 1];
-                            double xw = Math.Max(Math.Max(p.TireWearFL - l.TireWearFL, p.TireWearFR - l.TireWearFR),
-                                                 Math.Max(p.TireWearRL - l.TireWearRL, p.TireWearRR - l.TireWearRR)) * 100;
-                            if (xw > 0.05 && xw < 5) wear.Add(xw);
+                            double fl = (p.TireWearFL - l.TireWearFL) * 100, fr = (p.TireWearFR - l.TireWearFR) * 100;
+                            double rl = (p.TireWearRL - l.TireWearRL) * 100, rr = (p.TireWearRR - l.TireWearRR) * 100;
+                            double xw = Math.Max(Math.Max(fl, fr), Math.Max(rl, rr));
+                            if (xw > 0.05 && xw < 5)
+                            {
+                                wear.Add(xw);
+                                corners[0].Add(fl); corners[1].Add(fr); corners[2].Add(rl); corners[3].Add(rr);
+                            }
                         }
                     }
 
@@ -264,6 +288,13 @@ namespace User.TeamPace
             m.Team[LaneLoss] = Value(Median(lanes), 25, lanes.Count > 0 ? string.Format("{0} arrêt(s) sans relais mesuré(s)", lanes.Count) : "valeur par défaut");
             m.Team[StopReal] = Value(real.Count >= 2 ? Median(real) : double.NaN, double.NaN,
                 real.Count >= 2 ? string.Format("médiane de {0} arrêts de vos courses ici (voie, service, relais) : le plan s'y cale", real.Count) : "pas encore de course ici");
+            if (corners[0].Count >= 5)
+            {
+                var med = new double[4];
+                for (int c = 0; c < 4; c++) med[c] = Math.Max(0, Median(corners[c]));
+                double top = Math.Max(Math.Max(med[0], med[1]), Math.Max(med[2], med[3]));
+                if (top > 0) for (int c = 0; c < 4; c++) m.CornerShare[c] = Math.Max(0.2, med[c] / top);
+            }
             double maxWear = 0;
             foreach (var dd in m.Drivers) if (dd.Values[Wear].Measured) maxWear = Math.Max(maxWear, dd.Values[Wear].Value);
             m.Team[TyreLife] = Value(maxWear > 0 ? Math.Floor(60 / maxWear) : double.NaN, 40,
@@ -345,6 +376,8 @@ namespace User.TeamPace
             public double FuelL;
             public double EnergyPct;   // virtual energy put back, %
             public int Tyres;          // tyres changed
+            public int Wheels;         // which ones (FL 1, FR 2, RL 4, RR 8)
+            public double[] WearIn;    // wear of each tyre when the car comes in, %
             public bool TyresChosen;   // set by hand
             public bool FuelChosen;    // level asked for by hand
             public double Level;       // level when leaving the pits: % of virtual energy, or litres
@@ -357,6 +390,10 @@ namespace User.TeamPace
         {
             public List<StintPlan> Stints = new List<StintPlan>();
             public List<StopPlan> Stops = new List<StopPlan>();
+            public PreRace Quali;         // null without a qualifying
+            public double[] WearPerLap;   // each tyre, % per lap
+            /// <summary>Number shown for the first race stop: 2 after a qualifying (0 and 1 come before the race).</summary>
+            public int FirstStop { get { return Quali != null ? 2 : 1; } }
             public int Laps;
             public double Finish;         // race time when the last lap is completed
             public double PitLoss;
@@ -365,6 +402,70 @@ namespace User.TeamPace
             public bool EnergyMode;    // every driver uses virtual energy: refuels are counted in %
             public Dictionary<string, double> Driving = new Dictionary<string, double>();
             public List<string> Warnings = new List<string>();
+        }
+
+        /// <summary>Qualifying: tyres mounted at stop 0, run on it, then the race tyres at stop 1.</summary>
+        public class PreRace
+        {
+            public string Driver;
+            public int Laps;
+            public StopPlan Stop0 = new StopPlan(), Stop1 = new StopPlan();
+        }
+
+        // ─── Wheels ───────────────────────────────────────────────────────────
+
+        public const int FL = 1, FR = 2, RL = 4, RR = 8, AllWheels = 15;
+        /// <summary>Wear at which a tyre is due (the set's life is counted up to there).</summary>
+        public const double WearLimit = 60;
+
+        public static int Count(int wheels)
+        {
+            int n = 0;
+            for (int b = 0; b < 4; b++) if ((wheels & (1 << b)) != 0) n++;
+            return n;
+        }
+
+        /// <summary>Wheels for a number of tyres (plans saved before the choice per wheel).</summary>
+        public static int WheelsOf(int count)
+        {
+            return count <= 0 ? 0 : count == 1 ? FL : count == 2 ? FL | FR : count == 3 ? FL | FR | RL : AllWheels;
+        }
+
+        public static string WheelsLabel(int wheels)
+        {
+            switch (wheels & AllWheels)
+            {
+                case 0:              return "aucun pneu";
+                case AllWheels:      return "4 pneus";
+                case FL | FR:        return "les 2 avant";
+                case RL | RR:        return "les 2 arrière";
+                case FL | RL:        return "les 2 gauches";
+                case FR | RR:        return "les 2 droits";
+                default:             return Count(wheels) + (Count(wheels) > 1 ? " pneus" : " pneu");
+            }
+        }
+
+        /// <summary>Automatic choice: an axle is changed when one of its tyres would pass the limit in the next stint.</summary>
+        private static int AutoWheels(double[] wear, double[] perLap, int laps)
+        {
+            Func<int, bool> due = c => wear[c] + laps * perLap[c] > WearLimit;
+            return (due(0) || due(1) ? FL | FR : 0) | (due(2) || due(3) ? RL | RR : 0);
+        }
+
+        /// <summary>Fewer tyres left than asked: the axle that needs it most.</summary>
+        private static int Afford(int wheels, double[] wear, int left)
+        {
+            if (Count(wheels) <= left) return wheels;
+            if (left < 2) return 0;
+            return Math.Max(wear[0], wear[1]) >= Math.Max(wear[2], wear[3]) ? FL | FR : RL | RR;
+        }
+
+        /// <summary>Changes the given wheels: the tyres used, the wear and age reset.</summary>
+        private static void Mount(Simulation sim, int wheels, double[] wear, double[] age)
+        {
+            for (int c = 0; c < 4; c++)
+                if ((wheels & (1 << c)) != 0) { wear[c] = 0; age[c] = 0; }
+            sim.TyresUsed += Count(wheels);
         }
 
         /// <summary>
@@ -413,9 +514,40 @@ namespace User.TeamPace
             }
             int life = (int)Math.Max(1, m.Team[TyreLife].Value);
             double t = 0, fuelInTank = tank, energy = 100;
-            double tyreAge = 0;
+            // Each tyre: the most worn one reaches the limit after a set's life, the others in proportion
+            sim.WearPerLap = new double[4];
+            for (int c = 0; c < 4; c++) sim.WearPerLap[c] = WearLimit / life * m.CornerShare[c];
+            var wear = new double[4]; var age = new double[4];
             int lap = 0, stint = 0;
             sim.TyresUsed = 4;
+
+            if (plan.QualiMin > 0)
+            {
+                // Stop 0: the qualifying tyres. They run the qualifying, then stop 1 puts the race tyres
+                var q = new PreRace { Driver = keys.Contains(plan.QualiDriver ?? "") ? plan.QualiDriver : keys[0] };
+                var qp = m.Drivers.Find(d => d.Driver.Name == q.Driver).Values;
+                q.Laps = Math.Max(1, (int)Math.Floor(plan.QualiMin * 60.0 / qp[Pace].Value));
+                sim.TyresUsed = 0;
+                int w0 = plan.QualiWheels.HasValue && plan.QualiWheels.Value >= 0 ? plan.QualiWheels.Value & AllWheels : AllWheels;
+                q.Stop0 = new StopPlan { Wheels = w0, Tyres = Count(w0), TyresChosen = plan.QualiWheels.HasValue && plan.QualiWheels.Value >= 0, WearIn = new double[4], NextDriver = q.Driver };
+                Mount(sim, w0, wear, age);
+                for (int c = 0; c < 4; c++) { wear[c] += q.Laps * sim.WearPerLap[c]; age[c] += q.Laps; }
+
+                var k0 = DriverOf(plan, keys, 0);
+                var p0 = m.Drivers.Find(d => d.Driver.Name == k0).Values;
+                int forced0 = ForcedStop(plan, 0, 0);
+                int firstStint = forced0 > 0 ? forced0 : Limit(tank, 100, p0[Fuel].Value, p0[Energy].Value, p0[Pace].Value, plan.MaxStintMin);
+                bool chosen1 = plan.GridWheels.HasValue && plan.GridWheels.Value >= 0;
+                int w1 = chosen1 ? plan.GridWheels.Value & AllWheels : AutoWheels(wear, sim.WearPerLap, firstStint);
+                if (sim.TyresUsed + Count(w1) > plan.TyresAvailable)
+                {
+                    sim.Warnings.Add(string.Format("Arrêt 1 : {0} demandé(s) mais plus assez de pneus neufs ({1} pour la qualif et la course).", WheelsLabel(w1), plan.TyresAvailable));
+                    if (!chosen1) w1 = Afford(w1, wear, plan.TyresAvailable - sim.TyresUsed);
+                }
+                q.Stop1 = new StopPlan { Wheels = w1, Tyres = Count(w1), TyresChosen = chosen1, WearIn = (double[])wear.Clone(), NextDriver = k0, Full = true, Level = sim.EnergyMode ? 100 : tank };
+                Mount(sim, w1, wear, age);
+                sim.Quali = q;
+            }
 
             while (t < duration && stint < 200)
             {
@@ -435,8 +567,9 @@ namespace User.TeamPace
                 var s = new StintPlan { Driver = key, Start = t };
                 for (int k = 0; k < n && t < duration; k++)
                 {
-                    t += pace + deg * tyreAge;
-                    lap++; tyreAge++; s.Laps++;
+                    t += pace + deg * (age[0] + age[1] + age[2] + age[3]) / 4;
+                    lap++; s.Laps++;
+                    for (int c = 0; c < 4; c++) { age[c]++; wear[c] += sim.WearPerLap[c]; }
                     fuelInTank -= fuel; energy -= ve;
                 }
                 s.End = t;
@@ -472,14 +605,17 @@ namespace User.TeamPace
                 double add = sim.EnergyMode ? Math.Max(0, Math.Min(tank - fuelInTank, veAdd * ratio)) : Math.Max(0, targetFuel - fuelInTank);
                 next = Math.Min(Limit(fuelInTank + add, energy + veAdd, nFuel, nVe, nPace, plan.MaxStintMin), Math.Max(1, toFlag));
                 if (nextForced > 0) next = Math.Min(nextForced - lap, Math.Max(1, toFlag));
-                bool chosen = !tyresEveryStop && plan.StopTyres != null && stopIndex < plan.StopTyres.Count && plan.StopTyres[stopIndex] >= 0;
-                int tyres = chosen ? Math.Min(4, plan.StopTyres[stopIndex]) : (tyresEveryStop || tyreAge + next > life ? 4 : 0);
-                if (tyres > 0 && sim.TyresUsed + tyres > plan.TyresAvailable)
+                bool chosen = !tyresEveryStop && stopIndex < plan.StopWheels.Count && plan.StopWheels[stopIndex] >= 0;
+                int wheels = chosen ? plan.StopWheels[stopIndex] & AllWheels : tyresEveryStop ? AllWheels : AutoWheels(wear, sim.WearPerLap, next);
+                if (wheels != 0 && sim.TyresUsed + Count(wheels) > plan.TyresAvailable)
                 {
-                    sim.Warnings.Add(string.Format("Arrêt {0} : {1} pneu(s) demandé(s) mais plus assez de pneus neufs ({2} pour la course).", stopIndex + 1, tyres, plan.TyresAvailable));
-                    if (!chosen) tyres = Math.Max(0, plan.TyresAvailable - sim.TyresUsed);
+                    sim.Warnings.Add(string.Format("Arrêt {0} : {1} demandé(s) mais plus assez de pneus neufs ({2} {3}).", stopIndex + sim.FirstStop, WheelsLabel(wheels),
+                        plan.TyresAvailable, sim.Quali != null ? "pour la qualif et la course" : "pour la course"));
+                    if (!chosen) wheels = Afford(wheels, wear, plan.TyresAvailable - sim.TyresUsed);
                 }
-                if (tyres > 0) { sim.TyresUsed += tyres; tyreAge = tyreAge * (4 - tyres) / 4; }   // a partial change leaves part of the wear
+                int tyres = Count(wheels);
+                var wearIn = (double[])wear.Clone();
+                Mount(sim, wheels, wear, age);
                 double refuel = add / rate;   // the fuel that goes in sets the time
                 double stopped = Math.Max(refuel, tyreTime(tyres));   // refuel and tyres at the same time
                 double lost = lane + stopped;
@@ -488,7 +624,7 @@ namespace User.TeamPace
                     Lap = lap, LapChosen = forced > 0, At = t, FuelL = add, EnergyPct = veAdd, FuelChosen = fuelChosen,
                     Level = sim.EnergyMode ? energy + veAdd : fuelInTank + add,
                     Full = sim.EnergyMode ? energy + veAdd >= 99.5 : fuelInTank + add >= tank - 0.5,
-                    Tyres = tyres, TyresChosen = chosen, Stopped = stopped, Lost = lost, NextDriver = nextKey,
+                    Tyres = tyres, Wheels = wheels, WearIn = wearIn, TyresChosen = chosen, Stopped = stopped, Lost = lost, NextDriver = nextKey,
                 });
                 sim.PitLoss += lost;
                 t += lost;

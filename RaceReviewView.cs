@@ -110,7 +110,7 @@ namespace User.TeamPace
                     row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2.4, GridUnitType.Star) });
                     row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
                     row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                    row.Children.Add(StopsReview(review));
+                    row.Children.Add(StopsReview(review, sim.FirstStop));
                     var verdict = Verdict(sim, review);
                     Grid.SetColumn(verdict, 2);
                     row.Children.Add(verdict);
@@ -220,7 +220,7 @@ namespace User.TeamPace
                     t = st.End;
                     if (i < sim.Stops.Count)
                     {
-                        seg(g, sim.Stops[i].Lost, StopBrush, null, string.Format(Inv, "Arrêt prévu {0} · T{1} · +{2:0} s", i + 1, sim.Stops[i].Lap, sim.Stops[i].Lost));
+                        seg(g, sim.Stops[i].Lost, StopBrush, null, string.Format(Inv, "Arrêt prévu {0} · T{1} · +{2:0} s", i + sim.FirstStop, sim.Stops[i].Lap, sim.Stops[i].Lost));
                         t += sim.Stops[i].Lost;
                     }
                 }
@@ -262,7 +262,7 @@ namespace User.TeamPace
 
         // ─── Stop by stop ─────────────────────────────────────────────────────
 
-        private UIElement StopsReview(StrategyReview r)
+        private UIElement StopsReview(StrategyReview r, int first)
         {
             var table = new StackPanel();
             var widths = new[] { 58.0, 2.1, 2.6, 70, 2.3 };
@@ -297,7 +297,7 @@ namespace User.TeamPace
                 Brush mood = row.Mood > 0 ? Ui.Green : row.Mood < 0 ? Ui.Red : Ui.Muted;
                 var cells = new[]
                 {
-                    row.PlannedIndex >= 0 ? (row.PlannedIndex + 1).ToString() : "+",
+                    row.PlannedIndex >= 0 ? (row.PlannedIndex + first).ToString() : "+",
                     planned, real,
                     string.Format(Inv, "{0}{1:0} s", row.Delta >= 0 ? "+" : "−", Math.Abs(row.Delta)),
                     row.Verdict,
@@ -331,11 +331,11 @@ namespace User.TeamPace
             foreach (var u in r.Rows.Where(x => x.PlannedIndex < 0 && x.Real != null))
                 causes.Add(string.Format(Inv, "arrêt imprévu au tour {0} (≈ {1:0.0} t)", u.Real.Lap, u.Real.Loss / pace));
             foreach (var o in r.Rows.Where(x => x.PlannedIndex >= 0 && x.Real != null && x.Delta > 20))
-                causes.Add(string.Format(Inv, "arrêt {0} trop long (≈ {1:0.0} t)", o.PlannedIndex + 1, o.Delta / pace));
+                causes.Add(string.Format(Inv, "arrêt {0} trop long (≈ {1:0.0} t)", o.PlannedIndex + sim.FirstStop, o.Delta / pace));
             if (missing > 0) say(string.Format("−{0} tour{1} sur le plan{2}", missing, missing > 1 ? "s" : "", causes.Count > 0 ? " : " + string.Join(", ", causes) + "." : "."), Ui.Text);
             else if (missing < 0) say(string.Format("+{0} tour{1} sur le plan.", -missing, missing < -1 ? "s" : ""), Ui.Green);
             else say("Le nombre de tours prévu est tenu.", Ui.Green);
-            var ok = r.Rows.Where(x => x.PlannedIndex >= 0 && x.Mood > 0).Select(x => (x.PlannedIndex + 1).ToString()).ToList();
+            var ok = r.Rows.Where(x => x.PlannedIndex >= 0 && x.Mood > 0).Select(x => (x.PlannedIndex + sim.FirstStop).ToString()).ToList();
             if (ok.Count > 0) say(string.Format("Arrêt{0} {1} dans le plan.", ok.Count > 1 ? "s" : "", string.Join(", ", ok)), Ui.Green);
             double planPace = sim.Laps > 0 ? (sim.Finish - sim.PitLoss) / sim.Laps : 0;
             if (planPace > 0)

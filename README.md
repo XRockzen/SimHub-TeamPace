@@ -322,8 +322,9 @@ La stratégie a trois onglets : **Préparation**, **Analyse de course** et **Don
 
 ### Préparation
 
-- **La course** : circuit et catégorie, durée, heure de départ, nombre de pneus pour la course
-  (ceux du départ compris : 20 = 5 trains), réservoir, relais maximum, temps de conduite minimum
+- **La course** : circuit et catégorie, durée, **qualif roulée** (minutes en piste), heure de
+  départ, nombre de pneus disponibles pour la qualif et la course (ceux du départ compris : 20 =
+  5 trains), réservoir, relais maximum, temps de conduite minimum
   par pilote, et les pilotes de la course.
 - **Déroulé de la course** : les relais sur une frise à l'échelle du temps, une couleur par pilote,
   avec les tours, la durée et l'état des pneus de chacun. L'énergie passe d'abord : chaque relais
@@ -335,13 +336,22 @@ La stratégie a trois onglets : **Préparation**, **Analyse de course** et **Don
     « Remettre en automatique » sur la carte de l'arrêt annule le déplacement.
   - **Glisser un pilote** (en haut à droite) sur un relais pour qu'il le prenne, ou cliquer sur
     le relais pour choisir dans la liste.
+  - **Avec une qualif**, la frise commence avant la course : l'**arrêt 0** monte les pneus de la
+    qualif, la barre de qualif (son pilote se choisit comme pour un relais) les use, puis
+    l'**arrêt 1** monte les pneus du départ de la course. En automatique on garde ceux de la
+    qualif s'ils tiennent le premier relais : leur usure est reportée sur la course. Les arrêts
+    de course sont alors numérotés à partir de 2.
 - **Une carte par arrêt** (clic sur un arrêt pour la mettre en évidence) :
   - **Énergie** : le **niveau à la sortie des stands**, comme dans le menu des stands de LMU
     (par exemple 100 %, ou 40 % au dernier arrêt), et à côté ce qui est remis. L'essence suit
     (litres par % mesurés pour chaque pilote). Un niveau tapé à la main est encadré ; « auto » le
     remet au plein (ou au complément au dernier arrêt). Sur une voiture sans énergie virtuelle, la
     même case se règle en litres.
-  - **Pneus** : *auto*, 0, 2 ou 4 ; le temps d'arrêt suit (2 et 4 pneus mesurés).
+  - **Pneus** : la voiture vue de dessus, chaque pneu avec ce qu'il lui reste à l'arrivée au
+    stand. **Cliquer sur un pneu** le change (bleu = neuf) ou le garde : les 4, les avant, les
+    arrière, un côté, aucun… « auto » revient au choix automatique (un essieu est changé quand un
+    de ses pneus dépasserait 60 % d'usure dans le relais suivant, d'après l'usure mesurée de chaque
+    pneu sur ce circuit). Le temps d'arrêt suit.
   - **Relais** : qui rend la voiture et qui la prend ; le temps arrêté et le temps perdu.
 - **Enregistrer** écrit le plan dans le dossier d'équipe (sous-dossier `strategy`) : chaque
   coéquipier le retrouve dans **Plans de l'équipe**, avec qui l'a enregistré et quand. Un plan
