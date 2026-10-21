@@ -405,15 +405,17 @@ du rétroviseur central. Il a quatre pages, qu'on fait défiler avec les boutons
 - le coaching : voix, nombre de virages, distance à laquelle la consigne s'affiche ;
 - le plan de stratégie suivi (sinon le dernier plan de l'équipe pour ce circuit).
 
-**Boutons du volant** : dans SimHub › *Contrôles et événements*, ajoutez une action TeamPace pour
-chacune et choisissez le bouton :
+**Boutons du volant** : dans l'onglet Overlay, section *Boutons du volant*, « Cliquer pour
+configurer » puis appuyez sur le bouton à associer, comme partout dans SimHub :
 
-| Bouton | Action | Effet |
-|---|---|---|
-| A | `TeamPace.Overlay.PageSuivante` | page suivante |
-| B | `TeamPace.Overlay.Action` | selon la page : fantôme, voix, arrêt suivant, référence |
-| C | `TeamPace.Overlay.PagePrecedente` | page précédente |
-| D | `TeamPace.Overlay.Afficher` | masquer ou afficher |
+| Bouton | Effet |
+|---|---|
+| A | page suivante |
+| B | selon la page : fantôme, voix, arrêt suivant, référence |
+| C | page précédente |
+| D | masquer ou afficher |
+
+(Ce sont les actions `TeamPacePlugin.Overlay.*` de SimHub › *Contrôles et événements*.)
 
 Le jeu doit être en fenêtré ou en plein écran fenêtré (comme pour les overlays de SimHub). La
 référence se calcule à partir de la télémétrie de l'équipe : il faut des tours propres extraits

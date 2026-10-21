@@ -3,12 +3,18 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.3.1
+
+- **Overlay** : les boutons du volant s'associent directement dans l'onglet Overlay, avec le
+  « Cliquer pour configurer » habituel de SimHub (plus besoin de passer par Contrôles et
+  événements).
+
 ## 4.3.0
 
 **Overlay en course (première version).**
 
 - Un bandeau discret au-dessus du jeu, à placer où vous voulez, avec quatre pages qu'on fait
-  défiler aux boutons du volant (actions TeamPace dans SimHub › Contrôles et événements) :
+  défiler aux boutons du volant :
   - **Télémétrie** : vos pédales des dernières secondes, rapport, vitesse, écart en direct avec la
     référence ; le **fantôme** ajoute celles de la référence au même endroit de la piste ;
   - **Coaching** : les virages du Plan de travail, la consigne avant chacun avec un compte à

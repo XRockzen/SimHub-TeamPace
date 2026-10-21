@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -867,7 +867,7 @@ namespace User.TeamPace
                     return "Préparation : l'énergie d'abord, le plein à chaque arrêt et le complément au dernier. Glissez un arrêt (carré jaune) pour le déplacer ; glissez un pilote sur un relais, ou cliquez le relais. Chaque arrêt se règle sur sa carte : le niveau d'énergie voulu à la sortie des stands et les pneus.\n" +
                            "Analyse de course : une course réelle face au plan, puis toutes les voitures. Données mesurées : une valeur saisie passe en jaune ; effacez-la pour revenir à la mesure.";
                 case Screen.Overlay:
-                    return "Un seul overlay, discret, au-dessus du jeu : quatre pages (Télémétrie, Coaching, Course, Plan de travail) qu'on fait défiler avec les boutons du volant. Mappez les actions TeamPace dans SimHub › Contrôles et événements.\n" +
+                    return "Un seul overlay, discret, au-dessus du jeu : quatre pages (Télémétrie, Coaching, Course, Plan de travail) qu'on fait défiler avec les boutons du volant, associés dans la section « Boutons du volant » (Cliquer pour configurer).\n" +
                            "« Placer l'overlay » le montre à l'écran : glissez-le, la molette change sa taille. Le jeu doit être en fenêtré ou en plein écran fenêtré.";
                 case Screen.Analysis:
                     if (_state.RaceTab)

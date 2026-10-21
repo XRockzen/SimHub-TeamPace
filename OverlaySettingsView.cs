@@ -235,29 +235,40 @@ namespace User.TeamPace
             return p;
         }
 
+        /// <summary>SimHub's own "click to configure" control, one per wheel button, as everywhere in SimHub.</summary>
         private UIElement Buttons()
         {
             var p = new StackPanel();
-            p.Children.Add(Note("Dans SimHub › Contrôles et événements, ajoutez une action « TeamPace » pour chacune et choisissez le bouton du volant :"));
+            string prefix = typeof(TeamPacePlugin).Name + ".";   // SimHub names a plugin's actions after its class
             foreach (var row in new[]
             {
-                new[] { "A", "TeamPace.Overlay.PageSuivante", "page suivante" },
-                new[] { "B", "TeamPace.Overlay.Action", "fantôme / voix / arrêt suivant / référence" },
-                new[] { "C", "TeamPace.Overlay.PagePrecedente", "page précédente" },
-                new[] { "D", "TeamPace.Overlay.Afficher", "masquer ou afficher" },
+                new[] { "A", "Overlay.PageSuivante", "Page suivante" },
+                new[] { "B", "Overlay.Action", "Action de la page" },
+                new[] { "C", "Overlay.PagePrecedente", "Page précédente" },
+                new[] { "D", "Overlay.Afficher", "Masquer / afficher" },
             })
             {
-                var line = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
+                var line = new DockPanel { Margin = new Thickness(0, 6, 0, 0), MinHeight = 30 };
                 var key = Ui.T(row[0], 13, Ui.Amber, FontWeights.Bold);
                 key.Width = 20;
                 DockPanel.SetDock(key, Dock.Left);
                 line.Children.Add(key);
-                var txt = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap };
-                txt.Inlines.Add(new System.Windows.Documents.Run(row[1]) { Foreground = Ui.Text, FontWeight = FontWeights.SemiBold });
-                txt.Inlines.Add(new System.Windows.Documents.Run("  " + row[2]) { Foreground = Ui.Muted });
-                line.Children.Add(txt);
+                FrameworkElement editor = null;
+                try
+                {
+                    editor = new SimHub.Plugins.UI.ControlsEditor { ActionName = prefix + row[1], FriendlyName = row[2] };
+                }
+                catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Controls editor: " + ex.Message); }
+                if (editor == null)
+                {
+                    var txt = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Foreground = Ui.Text };
+                    txt.Text = row[2] + " : action « " + prefix + row[1] + " » dans Contrôles et événements";
+                    editor = txt;
+                }
+                line.Children.Add(editor);
                 p.Children.Add(line);
             }
+            p.Children.Add(Note("Cliquez puis appuyez sur le bouton du volant à associer, comme partout dans SimHub. B dépend de la page : fantôme, voix, arrêt suivant, référence."));
             return p;
         }
 
