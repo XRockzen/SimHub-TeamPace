@@ -3,6 +3,18 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.5.0
+
+- **Overlay : pages par type de session.** Un tableau (essais, qualif, course × pages) dit quelles
+  pages chaque session montre. Par défaut : en essais la télémétrie, le coaching et le plan de
+  travail ; en qualif la télémétrie ; en course la télémétrie et la stratégie. Le type de session
+  est détecté tout seul, et les boutons ne font défiler que ses pages.
+- **Pitwall : l'analyse de course en direct.** Sous le bandeau, tout l'écran « Toutes les voitures »
+  de l'onglet Course, construit pendant la course à partir de ce que SimHub lit de chaque voiture :
+  où le temps est parti face au premier, voitures et arrêts, écart au premier tour par tour. Il se
+  met à jour à chaque tour du premier. La fenêtre se déplace, se redimensionne et se manipule à la
+  souris.
+
 ## 4.4.0
 
 - **Stratégie en direct** : en course, le plan est recalculé à chaque fin de tour à partir de la

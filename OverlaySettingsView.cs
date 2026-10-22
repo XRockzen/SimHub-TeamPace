@@ -105,29 +105,49 @@ namespace User.TeamPace
             var p = new StackPanel();
             p.Children.Add(SliderRow("Taille", 40, 300, S.Scale * 100, v => string.Format("{0:0} %", v), v => { S.Scale = v / 100; Changed(false); }));
             p.Children.Add(SliderRow("Fond", 0, 100, S.Opacity * 100, v => string.Format("{0:0} %", v), v => { S.Opacity = v / 100; Changed(false); }));
-            p.Children.Add(Label("Pages (A / C pour passer de l'une à l'autre)"));
-            var pages = new WrapPanel();
-            for (int i = 0; i < 4; i++)
-            {
-                int k = i;
-                var c = Check(OverlaySettings.PageName((OverlayPage)i), S.Pages[i], v =>
-                {
-                    S.Pages[k] = v;
-                    if (!S.Pages.Any(x => x)) S.Pages[0] = true;
-                    if (!S.Pages[S.Page]) OverlayService.NextPage(1);
-                    Changed(false);
-                });
-                c.Margin = new Thickness(0, 2, 14, 2);
-                pages.Children.Add(c);
-            }
-            p.Children.Add(pages);
-            p.Children.Add(Label("Page affichée"));
-            var cb = new ComboBox { Height = 26, FontSize = 12.5, Width = 200, HorizontalAlignment = HorizontalAlignment.Left };
-            for (int i = 0; i < 4; i++) cb.Items.Add(OverlaySettings.PageName((OverlayPage)i));
-            cb.SelectedIndex = S.Page;
-            cb.SelectionChanged += (s, e) => { if (_building || cb.SelectedIndex < 0) return; S.Page = cb.SelectedIndex; S.Pages[S.Page] = true; Changed(false); };
-            p.Children.Add(cb);
+            p.Children.Add(Label("Pages par type de session (A / C pour passer de l'une à l'autre)"));
+            p.Children.Add(SessionTable());
             return p;
+        }
+
+        /// <summary>Which pages each kind of session shows: sessions in rows, pages in columns.</summary>
+        private UIElement SessionTable()
+        {
+            var g = new Grid { Margin = new Thickness(0, 2, 0, 0) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });
+            for (int c = 0; c < 4; c++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int r = 0; r < 4; r++) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(r == 0 ? 22 : 28) });
+            var heads = new[] { "Télémétrie", "Coaching", "Course", "Plan" };
+            for (int c = 0; c < 4; c++)
+            {
+                var h = Ui.T(heads[c], 11.5, Ui.Muted);
+                h.HorizontalAlignment = HorizontalAlignment.Center;
+                h.ToolTip = OverlaySettings.PageName((OverlayPage)c);
+                Grid.SetColumn(h, c + 1);
+                g.Children.Add(h);
+            }
+            for (int r = 0; r < 3; r++)
+            {
+                var kind = (SessionKind)r;
+                var bg = new Border { Background = r % 2 == 0 ? Ui.Panel : Brushes.Transparent, CornerRadius = new CornerRadius(4) };
+                Grid.SetRow(bg, r + 1); Grid.SetColumnSpan(bg, 5);
+                g.Children.Add(bg);
+                var name = Ui.T(OverlaySettings.SessionName(kind), 12.5, Ui.Text);
+                name.Margin = new Thickness(6, 0, 0, 0);
+                Grid.SetRow(name, r + 1);
+                g.Children.Add(name);
+                for (int c = 0; c < 4; c++)
+                {
+                    int index = r * 4 + c;
+                    var box = new CheckBox { IsChecked = S.SessionPages[index], HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                                             ToolTip = OverlaySettings.PageName((OverlayPage)c) + " en " + OverlaySettings.SessionName(kind).ToLowerInvariant() };
+                    box.Checked += (snd, e) => { S.SessionPages[index] = true; Changed(false); };
+                    box.Unchecked += (snd, e) => { S.SessionPages[index] = false; Changed(false); };
+                    Grid.SetRow(box, r + 1); Grid.SetColumn(box, c + 1);
+                    g.Children.Add(box);
+                }
+            }
+            return g;
         }
 
         private UIElement Telemetry()
@@ -289,7 +309,8 @@ namespace User.TeamPace
                 place.Content = OverlayService.PitEditMode ? "Terminé" : "Placer le pitwall à l'écran";
             };
             p.Children.Add(place);
-            p.Children.Add(SliderRow("Taille", 40, 300, S.PitScale * 100, v => string.Format("{0:0} %", v), v => { S.PitScale = v / 100; Changed(false); }));
+            p.Children.Add(SliderRow("Taille du texte", 40, 300, S.PitScale * 100, v => string.Format("{0:0} %", v), v => { S.PitScale = v / 100; Changed(false); }));
+            p.Children.Add(Note("Sous le bandeau, l'analyse de course de toutes les voitures, en direct. La fenêtre se déplace par son bandeau et se redimensionne par son coin."));
             p.Children.Add(ControlRow("P", "Pitwall.Afficher", "Masquer / afficher"));
             p.Children.Add(Note("Il suit le plan de stratégie choisi dans la section Course."));
             return p;

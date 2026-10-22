@@ -5,6 +5,9 @@ namespace User.TeamPace
 {
     public enum OverlayPage { Telemetry = 0, Coaching = 1, Race = 2, Plan = 3 }
 
+    /// <summary>The kind of session being driven: each one shows its own pages.</summary>
+    public enum SessionKind { Practice = 0, Qualifying = 1, Race = 2 }
+
     /// <summary>Everything the in-race overlay can be set to, saved in the plugin data folder (overlay.json).</summary>
     public class OverlaySettings
     {
@@ -17,8 +20,21 @@ namespace User.TeamPace
         public double Top      { get; set; }
         public double Scale    { get; set; }   // 1 = 760 × 150 px
         public double Opacity  { get; set; }   // background, 0..1
-        public bool[] Pages    { get; set; }   // shown pages, by OverlayPage
+        public bool[] SessionPages { get; set; }   // pages shown in each kind of session: [kind * 4 + page]
         public int    Page     { get; set; }
+
+        public bool Shows(SessionKind kind, OverlayPage page) { return SessionPages[(int)kind * 4 + (int)page]; }
+
+        /// <summary>Practice: telemetry, coaching, work plan. Qualifying: telemetry. Race: telemetry and race plan.</summary>
+        public static bool[] DefaultSessionPages()
+        {
+            return new[]
+            {
+                true, true,  false, true,    // practice
+                true, false, false, false,   // qualifying
+                true, false, true,  false,   // race
+            };
+        }
 
         // Telemetry
         public double WindowSec { get; set; }  // seconds shown by the scrolling curves
@@ -43,25 +59,29 @@ namespace User.TeamPace
         public double PitLeft        { get; set; }
         public double PitTop         { get; set; }
         public double PitScale       { get; set; }
+        public double PitW           { get; set; }   // window size, px
+        public double PitH           { get; set; }
 
         public static OverlaySettings Default()
         {
             return new OverlaySettings
             {
                 Enabled = false, Left = double.NaN, Top = 24, Scale = 1, Opacity = 0.88,
-                Pages = new[] { true, true, true, true }, Page = 0,
+                SessionPages = DefaultSessionPages(), Page = 0,
                 WindowSec = 8, Ghost = true,
                 Reference = "ideal", Voice = false, CoachCorners = 3, AnnounceMeters = 300,
-                PitwallEnabled = false, PitLeft = double.NaN, PitTop = 200, PitScale = 1,
+                PitwallEnabled = false, PitLeft = double.NaN, PitTop = 200, PitScale = 1, PitW = 1300, PitH = 900,
             };
         }
 
         /// <summary>Values missing or out of range in a file saved by an older version.</summary>
         public void Normalize()
         {
-            if (Pages == null || Pages.Length != 4) Pages = new[] { true, true, true, true };
+            if (SessionPages == null || SessionPages.Length != 12) SessionPages = DefaultSessionPages();
             if (!(Scale >= 0.4 && Scale <= 3)) Scale = 1;
             if (!(PitScale >= 0.4 && PitScale <= 3)) PitScale = 1;
+            if (!(PitW >= 500)) PitW = 1300;
+            if (!(PitH >= 300)) PitH = 900;
             if (!(Opacity >= 0 && Opacity <= 1)) Opacity = 0.88;
             if (!(WindowSec >= 2 && WindowSec <= 30)) WindowSec = 8;
             if (string.IsNullOrEmpty(Reference)) Reference = "ideal";
@@ -114,6 +134,11 @@ namespace User.TeamPace
                 case OverlayPage.Race:      return "Course";
                 default:                    return "Plan de travail";
             }
+        }
+
+        public static string SessionName(SessionKind k)
+        {
+            return k == SessionKind.Practice ? "Essais" : k == SessionKind.Qualifying ? "Qualif" : "Course";
         }
 
         public static string ReferenceName(string kind, string driver)

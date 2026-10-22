@@ -13,7 +13,7 @@ namespace User.TeamPace
     /// (clicks go through to the game) except while it is being placed. Works with the game in
     /// a window or in borderless full screen, like SimHub's overlays.
     /// </summary>
-    internal class OverlayWindow : Window
+    internal class OverlayWindow : Window, IOverlayHost
     {
         private readonly OverlayCanvas _view;
         private readonly bool _pit;

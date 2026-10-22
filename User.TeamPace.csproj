@@ -114,6 +114,8 @@
     <Compile Include="OverlayWindow.cs" />
     <Compile Include="OverlaySettingsView.cs" />
     <Compile Include="PitwallView.cs" />
+    <Compile Include="PitwallWindow.cs" />
+    <Compile Include="LiveField.cs" />
     <Compile Include="StrategyView.cs" />
     <Compile Include="StrategyReview.cs" />
     <Compile Include="RaceReviewView.cs" />

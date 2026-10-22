@@ -400,7 +400,11 @@ du rétroviseur central. Il a quatre pages, qu'on fait défiler avec les boutons
    puis au dernier), et votre meilleur tour face à la référence.
 
 **Réglages** : l'onglet **Overlay** du plugin montre un aperçu et règle tout :
-- l'affichage (taille, fond, pages) ; **Placer l'overlay à l'écran** le montre pour le glisser où
+- les **pages de chaque type de session**, dans un tableau (essais, qualif, course en lignes,
+  pages en colonnes). Par défaut : en essais la télémétrie, le coaching et le plan de travail ; en
+  qualif la télémétrie ; en course la télémétrie et la stratégie. Les boutons ne font défiler que
+  les pages du type de session en cours ;
+- l'affichage (taille, fond) ; **Placer l'overlay à l'écran** le montre pour le glisser où
   vous voulez, la molette change sa taille ;
 - la durée affichée des courbes (la vitesse de défilement) et le fantôme ;
 - la **référence** : l'idéal de l'équipe (le meilleur passage de chaque virage, mis bout à bout),
@@ -424,11 +428,17 @@ configurer » puis appuyez sur le bouton à associer, comme partout dans SimHub 
 ### Pitwall
 
 Pour le coéquipier qui suit la course dans la session pendant qu'un autre roule : sur **son**
-PC, son SimHub lit la voiture qu'il regarde, sans lien entre les ordinateurs. Le pitwall (une
-fenêtre plus grande, à cocher et placer dans la section *Pitwall* de l'onglet Overlay) montre le
-relais en cours, l'essence et sa marge, le **prochain arrêt recalculé** et **ce qu'il faut régler
-dans le menu des stands** : pilote, niveau d'énergie (et l'essence correspondante), pneus. Puis les
-arrêts suivants et les derniers tours, comparés au rythme prévu.
+PC, son SimHub lit la voiture qu'il regarde et toutes les autres, sans lien entre les ordinateurs.
+Le pitwall est une fenêtre au-dessus du jeu (à cocher dans la section *Pitwall* de l'onglet
+Overlay), qui se déplace par son bandeau et se redimensionne par son coin :
+
+- **en haut**, le relais en cours, l'essence et sa marge, le **prochain arrêt recalculé** et **ce
+  qu'il faut régler dans le menu des stands** : pilote, niveau d'énergie (et l'essence
+  correspondante), pneus ; puis les arrêts suivants et les derniers tours ;
+- **en dessous, l'analyse de course de l'onglet Course, en direct** : où le temps est parti face au
+  premier de la catégorie (rythme, arrêts, hors arrêts), ce qui marche et ce qui est à revoir,
+  toutes les voitures avec leurs arrêts, et l'**écart au premier tour par tour** (survol ou clic
+  sur un nom pour suivre une voiture). Elle se met à jour à chaque tour du premier.
 
 ![Le pitwall](docs/images/18-pitwall.png)
 

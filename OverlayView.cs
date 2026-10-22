@@ -58,7 +58,7 @@ namespace User.TeamPace
             dc.DrawRoundedRectangle(bg, BorderPen, new Rect(0.5, 0.5, W - 1, H - 1), 10, 10);
             if (EditMode) dc.DrawRoundedRectangle(null, EditPen, new Rect(1, 1, W - 2, H - 2), 10, 10);
 
-            var page = (OverlayPage)s.Page;
+            var page = (OverlayPage)Math.Max(0, OverlayService.CurrentPage);
             Header(dc, s, page);
             switch (page)
             {
@@ -106,7 +106,7 @@ namespace User.TeamPace
             double x = W - 12;
             for (int p = 3; p >= 0; p--)
             {
-                if (!s.Pages[p]) continue;
+                if (!s.Shows(OverlayService.Session, (OverlayPage)p)) continue;
                 bool on = p == (int)page;
                 double pw = on ? 14 : 4;
                 dc.DrawRoundedRectangle(on ? Text : Faint, null, new Rect(x - pw, 13, pw, 4), 2, 2);

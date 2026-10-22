@@ -116,6 +116,19 @@ namespace User.TeamPace
         public static int RefGear, CornerNumber, Lap;
         public static double Fuel, SessionLeft;
         public static bool IsRace;
+        public static SessionKind Session = SessionKind.Practice;
+
+        /// <summary>The page shown: the one chosen if this kind of session shows it, else the first it shows; -1: none.</summary>
+        public static int CurrentPage
+        {
+            get
+            {
+                var s = OverlaySettings.Current;
+                if (s.Shows(Session, (OverlayPage)s.Page)) return s.Page;
+                for (int p = 0; p < 4; p++) if (s.Shows(Session, (OverlayPage)p)) return p;
+                return -1;
+            }
+        }
         public static OverlayFocus Approach, Bilan, Next;
         public static double ApproachLeft, NextIn;
         public static double SessionFirst = double.NaN, SessionBest = double.NaN, PlanGap = double.NaN;
@@ -200,7 +213,11 @@ namespace User.TeamPace
             Fuel = d.Fuel;
             SessionLeft = d.SessionTimeLeft.TotalSeconds;
             IsRace = d.SessionTypeName != null && d.SessionTypeName.IndexOf("race", StringComparison.OrdinalIgnoreCase) >= 0;
+            Session = IsRace ? SessionKind.Race
+                    : d.SessionTypeName != null && d.SessionTypeName.IndexOf("qual", StringComparison.OrdinalIgnoreCase) >= 0 ? SessionKind.Qualifying
+                    : SessionKind.Practice;
             if (IsRace != _wasRace) { _wasRace = IsRace; ResetRace(); }
+            if (IsRace && (s.PitwallEnabled || PitEditMode)) LiveField.Update(d.Opponents);   // every car, for the pitwall's analysis
             // Pit stops of the race: counted at the lane entry, the stint restarts at the exit
             bool lane = d.IsInPitLane != 0;
             if (IsRace && lane && !_inLane && d.SpeedKmh > 5)
@@ -265,6 +282,7 @@ namespace User.TeamPace
         private static void ResetRace()
         {
             RaceLaps.Clear(); RaceFuel.Clear(); RecentLaps = new double[0];
+            LiveField.Reset();
             RaceStops = 0; StintLaps = 0; StintStart = 0; _tyreLap = 0; _lapStartFuel = -1; _pitThisLap = false;
             LiveSim = null; LiveLap = -1; LivePace = LiveFuel = double.NaN;
         }
@@ -378,7 +396,7 @@ namespace User.TeamPace
             if (approach != null && approach.SpokenLap != Lap && approachLeft > 40)
             {
                 approach.SpokenLap = Lap;
-                if (s.Voice && s.Page == (int)OverlayPage.Coaching && !_hidden) Say(approach.Spoken);
+                if (s.Voice && CurrentPage == (int)OverlayPage.Coaching && !_hidden) Say(approach.Spoken);
             }
         }
 
@@ -577,10 +595,11 @@ namespace User.TeamPace
         public static void NextPage(int dir)
         {
             var s = OverlaySettings.Current;
+            int from = Math.Max(0, CurrentPage);
             for (int k = 1; k <= 4; k++)
             {
-                int p = ((s.Page + dir * k) % 4 + 4) % 4;
-                if (s.Pages[p]) { s.Page = p; break; }
+                int p = ((from + dir * k) % 4 + 4) % 4;
+                if (s.Shows(Session, (OverlayPage)p)) { s.Page = p; break; }
             }
             OverlaySettings.Save();
         }
@@ -589,7 +608,7 @@ namespace User.TeamPace
         public static void PageAction()
         {
             var s = OverlaySettings.Current;
-            switch ((OverlayPage)s.Page)
+            switch ((OverlayPage)CurrentPage)
             {
                 case OverlayPage.Telemetry: s.Ghost = !s.Ghost; break;
                 case OverlayPage.Coaching:  s.Voice = !s.Voice; break;
@@ -617,7 +636,7 @@ namespace User.TeamPace
 
         // ─── Window ───────────────────────────────────────────────────────────
 
-        private static OverlayWindow _window, _pitWindow;
+        private static Window _window, _pitWindow;
         private static DispatcherTimer _watch;
 
         public static void Init(string dataDir)
@@ -644,18 +663,18 @@ namespace User.TeamPace
             var s = OverlaySettings.Current;
             try
             {
-                Show(ref _window, false, EditMode || (s.Enabled && !_hidden && Live), EditMode, s);
-                Show(ref _pitWindow, true, PitEditMode || (s.PitwallEnabled && !_pitHidden && Live), PitEditMode, s);
+                Show(ref _window, () => new OverlayWindow(false), EditMode || (s.Enabled && !_hidden && Live && CurrentPage >= 0), EditMode, s);
+                Show(ref _pitWindow, () => new PitwallWindow(), PitEditMode || (s.PitwallEnabled && !_pitHidden && Live), PitEditMode, s);
             }
             catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Overlay window: " + ex.Message); }
         }
 
-        private static void Show(ref OverlayWindow w, bool pitwall, bool show, bool edit, OverlaySettings s)
+        private static void Show(ref Window w, Func<Window> make, bool show, bool edit, OverlaySettings s)
         {
             if (show)
             {
-                if (w == null) w = new OverlayWindow(pitwall);
-                w.Apply(s, edit);
+                if (w == null) w = make();
+                ((IOverlayHost)w).Apply(s, edit);
                 if (!w.IsVisible) w.Show();
             }
             else if (w != null && w.IsVisible) w.Hide();
