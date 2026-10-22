@@ -381,10 +381,11 @@ du rétroviseur central. Il a quatre pages, qu'on fait défiler avec les boutons
 
 ![Les quatre pages de l'overlay](docs/images/17-overlay.png)
 
-1. **Télémétrie** : votre accélérateur et votre frein des dernières secondes, le rapport, la
-   vitesse et l'écart en direct avec le tour de référence. Avec le **fantôme**, les pédales, le
-   rapport et la vitesse de la référence au même endroit de la piste s'affichent en pointillés,
-   avec l'écart sur le virage en cours.
+1. **Télémétrie** : votre accélérateur et votre frein des dernières secondes, le rapport et la
+   vitesse, rien d'autre. Avec le **fantôme** (bouton B), les pédales, le rapport et la vitesse de
+   la référence au même endroit de la piste s'affichent en pointillés, avec l'écart au tour et
+   l'écart sur le virage en cours. Les chiffres sont lissés et rafraîchis 4 fois par seconde, comme
+   sur un dashboard.
 2. **Coaching** : les virages du Plan de travail (trois au plus). Avant chacun, la consigne
    (« Freine 15 m plus tard ») et un compte à rebours jusqu'au point de freinage de la
    référence, avec un trait blanc sur votre freinage précédent ; après, le bilan du passage

@@ -3,6 +3,12 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.5.1
+
+- **Overlay, télémétrie** : fantôme masqué, plus aucune comparaison (pédales, rapport, vitesse
+  seulement). Les chiffres sont lissés et rafraîchis 4 fois par seconde au lieu de 30 : ils ne
+  scintillent plus. L'écart sur le virage est plus gros, l'écart au tour au centième.
+
 ## 4.5.0
 
 - **Overlay : pages par type de session.** Un tableau (essais, qualif, course × pages) dit quelles

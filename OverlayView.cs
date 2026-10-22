@@ -158,25 +158,64 @@ namespace User.TeamPace
             Poly(dc, _a, GasPen, false, 0);
             dc.DrawLine(NowPen, new Point(x0 + cw - 0.5, y0 + 2), new Point(x0 + cw - 0.5, y0 + ch - 4));
 
-            // Right: pedals, gear and speed, gap to the reference
+            // Right: pedals, gear, speed. Numbers calm down (smoothed, shown 4 times a second), as on a dashboard
+            Smooth();
             dc.DrawRectangle(Sep, null, new Rect(506, 30, 1, 104));
-            Bar(dc, 520, 44, 88, OverlayService.Brake, Brk);
-            Bar(dc, 534, 44, 88, OverlayService.Throttle, Gas);
-            double gw = T(dc, OverlayService.Gear, 556, 36, 50, Text, true);
-            if (ghost && OverlayService.RefGear > 0) T(dc, "/ " + OverlayService.RefGear, 560 + gw, 62, 17, Faint);
-            double sw = T(dc, OverlayService.Speed.ToString("0", Fr), 556, 104, 17, Text);
-            T(dc, ghost && !double.IsNaN(OverlayService.RefSpeed) ? "/ " + OverlayService.RefSpeed.ToString("0", Fr) + " km/h" : "km/h", 560 + sw, 108, 12, Faint);
+            Bar(dc, 522, 42, 90, OverlayService.Brake, Brk);
+            Bar(dc, 538, 42, 90, OverlayService.Throttle, Gas);
+            if (!ghost)
+            {
+                // Without the ghost: the car only, nothing compared
+                T(dc, OverlayService.Gear, 606, 34, 64, Text, true, 2);
+                T(dc, double.IsNaN(_sSpeed) ? "—" : _sSpeed.ToString("0", Fr), W - 14, 44, 40, Text, true, 1);
+                T(dc, "km/h", W - 14, 94, 13, Faint, false, 1);
+                return;
+            }
+            double gw = T(dc, OverlayService.Gear, 560, 34, 50, Text, true);
+            if (OverlayService.RefGear > 0) T(dc, "/ " + OverlayService.RefGear, 564 + gw, 60, 17, Faint);
+            double sw = T(dc, double.IsNaN(_sSpeed) ? "—" : _sSpeed.ToString("0", Fr), 560, 102, 18, Text);
+            T(dc, !double.IsNaN(_sRefSpeed) ? "/ " + _sRefSpeed.ToString("0", Fr) + " km/h" : "km/h", 564 + sw, 106, 12, Faint);
 
             var r = OverlayService.Reference;
             string refName = r != null ? r.Label : OverlayService.Demo ? "Idéal de l'équipe" : "pas de référence";
-            T(dc, "Δ " + refName.ToUpperInvariant(), W - 12, 44, 11, Muted, false, 1);
-            double d = OverlayService.Delta;
-            T(dc, double.IsNaN(d) ? "—" : Signed(d, "0.000"), W - 12, 58, 30, GapBrush(d), true, 1);
-            double cd = OverlayService.CornerDelta;
-            if (!double.IsNaN(cd))
-                T(dc, "V" + OverlayService.CornerNumber + " : " + Signed(cd, "0.00"), W - 12, 98, 13, GapBrush(cd), false, 1);
+            T(dc, "Δ " + refName.ToUpperInvariant(), W - 12, 36, 11, Muted, false, 1);
+            T(dc, double.IsNaN(_sDelta) ? "—" : Signed(_sDelta, "0.00"), W - 12, 48, 30, GapBrush(_sDelta), true, 1);
+            if (!double.IsNaN(_sCorner))
+            {
+                double vw = T(dc, Signed(_sCorner, "0.00"), W - 12, 92, 24, GapBrush(_sCorner), true, 1);
+                T(dc, "V" + _shownCorner, W - 18 - vw, 100, 14, Muted, false, 1);
+            }
             else if (r == null && !OverlayService.Demo)
                 T(dc, "voir l'onglet Overlay", W - 12, 98, 12, Faint, false, 1);
+        }
+
+        // ─── Calm numbers: smoothed over about half a second, redrawn 4 times a second ─────
+
+        private double _last = double.NaN, _nextShow;
+        private double _fDelta = double.NaN, _fCorner = double.NaN, _fSpeed = double.NaN, _fRefSpeed = double.NaN;
+        private double _sDelta = double.NaN, _sCorner = double.NaN, _sSpeed = double.NaN, _sRefSpeed = double.NaN;
+        private int _corner = -1, _shownCorner;
+
+        private void Smooth()
+        {
+            double now = OverlayService.Now;
+            double dt = double.IsNaN(_last) ? 1 : Math.Max(0, Math.Min(1, now - _last));
+            _last = now;
+            _fDelta = Ema(_fDelta, OverlayService.Delta, dt, 0.6);
+            if (OverlayService.CornerNumber != _corner) { _corner = OverlayService.CornerNumber; _fCorner = double.NaN; }   // a new corner starts from its own gap
+            _fCorner = Ema(_fCorner, OverlayService.CornerDelta, dt, 0.6);
+            _fSpeed = Ema(_fSpeed, OverlayService.Speed, dt, 0.2);
+            _fRefSpeed = Ema(_fRefSpeed, OverlayService.RefSpeed, dt, 0.2);
+            if (now < _nextShow) return;
+            _nextShow = now + 0.25;
+            _sDelta = _fDelta; _sCorner = _fCorner; _sSpeed = _fSpeed; _sRefSpeed = _fRefSpeed; _shownCorner = _corner;
+        }
+
+        private static double Ema(double filtered, double value, double dt, double tau)
+        {
+            if (double.IsNaN(value)) return double.NaN;
+            if (double.IsNaN(filtered)) return value;
+            return filtered + (value - filtered) * (1 - Math.Exp(-dt / tau));
         }
 
         private static void Poly(DrawingContext dc, List<Point> pts, Pen pen, bool fill, double baseY)
