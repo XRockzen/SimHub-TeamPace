@@ -369,6 +369,8 @@ namespace User.TeamPace
             {
                 var sim = OverlayService.LiveSim ?? race.Sim;   // recalculated at each lap once the race runs
                 int j = sim.Stops.FindIndex(st => st.Lap > done);
+                // The original plan, not recalculated yet: the next stop is the one after those made
+                if (sim == race.Sim && OverlayService.RaceStops > 0 && OverlayService.IsRace) j = OverlayService.RaceStops < sim.Stops.Count ? Math.Max(j, OverlayService.RaceStops) : -1;
                 if (j >= 0)
                 {
                     j = Math.Min(sim.Stops.Count - 1, j + OverlayService.StopView);
@@ -382,7 +384,7 @@ namespace User.TeamPace
             for (int c = 1; c < 4; c++) dc.DrawRectangle(Sep, null, new Rect(12 + c * colW, 30, 1, 104));
 
             // 1. Laps to the stop
-            int toGo = demo ? 15 : stop != null ? stop.Lap - done : 0;
+            int toGo = demo ? 15 : stop != null ? Math.Max(0, stop.Lap - done) : 0;
             if (demo || stop != null)
             {
                 T(dc, "ARRÊT " + (demo ? 3 : number) + " DANS", 12, 40, 11, Muted);
@@ -401,12 +403,12 @@ namespace User.TeamPace
             double x = 12 + colW + 12;
             double tank = demo ? 100 : Math.Max(1, race.Plan.TankL);
             double perLap = demo ? 3.9 : !double.IsNaN(OverlayService.LiveFuel) ? OverlayService.LiveFuel : race.FuelPerLap;
-            T(dc, "ESSENCE", x, 40, 11, Muted);
-            T(dc, OverlayService.Fuel.ToString("0", Fr) + " L", x, 54, 24, Text, true);
+            T(dc, OverlayService.FuelEstimated ? "ESSENCE · ESTIMÉE" : "ESSENCE", x, 40, 11, OverlayService.FuelEstimated ? Amber : Muted);
+            T(dc, double.IsNaN(OverlayService.Fuel) ? "—" : (OverlayService.FuelEstimated ? "≈ " : "") + OverlayService.Fuel.ToString("0", Fr) + " L", x, 54, 24, Text, true);
             double bw = colW - 24;
             dc.DrawRoundedRectangle(Track, null, new Rect(x, 88, bw, 8), 4, 4);
-            dc.DrawRoundedRectangle(Blue, null, new Rect(x, 88, bw * Math.Max(0, Math.Min(1, OverlayService.Fuel / tank)), 8), 4, 4);
-            if (!double.IsNaN(perLap) && perLap > 0 && toGo > 0)
+            if (!double.IsNaN(OverlayService.Fuel)) dc.DrawRoundedRectangle(Blue, null, new Rect(x, 88, bw * Math.Max(0, Math.Min(1, OverlayService.Fuel / tank)), 8), 4, 4);
+            if (!double.IsNaN(perLap) && perLap > 0 && toGo > 0 && !double.IsNaN(OverlayService.Fuel))
             {
                 double need = toGo * perLap;
                 dc.DrawRectangle(Amber, null, new Rect(x + bw * Math.Min(1, need / tank) - 1, 85, 2, 14));

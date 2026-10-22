@@ -443,6 +443,15 @@ Overlay), qui se déplace par son bandeau et se redimensionne par son coin :
 
 ![Le pitwall](docs/images/18-pitwall.png)
 
+**En spectateur**, SimHub ne reçoit rien de LMU : TeamPace lit alors directement la mémoire partagée
+de LMU. Votre voiture est reconnue au nom du pilote au volant (un pilote de l'équipe). Tours,
+temps restant, arrêts, pilote au volant, pédales et vitesse sont lus en direct, de même que
+toutes les voitures pour l'analyse. LMU ne publie pas l'essence d'une voiture qu'on regarde
+seulement : elle est **estimée** d'après le plan (plein à chaque arrêt, consommation prévue), et
+reste inconnue tant qu'on n'a pas vu le départ ou un arrêt. Rejoint en cours de course, les tours
+d'avant votre arrivée sont placés sur la courbe d'écarts mais ne comptent ni dans le rythme ni
+dans les arrêts.
+
 Le jeu doit être en fenêtré ou en plein écran fenêtré (comme pour les overlays de SimHub). La
 référence se calcule à partir de la télémétrie de l'équipe : il faut des tours propres extraits
 sur ce circuit (« ⟳ Tout mettre à jour »). Pendant que vous roulez, l'overlay ne lit rien sur

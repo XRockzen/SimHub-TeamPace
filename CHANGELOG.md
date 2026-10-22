@@ -3,6 +3,18 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.6.0
+
+- **Overlay et pitwall en spectateur.** Quand on regarde un coéquipier rouler, SimHub ne reçoit
+  rien de LMU : TeamPace lit maintenant directement la mémoire partagée de LMU. Votre voiture est
+  reconnue au pilote au volant ; tours, temps restant, arrêts (compteur de LMU), pilote, pédales
+  et vitesse sont lus en direct. L'essence, que LMU ne publie pas pour une voiture qu'on regarde,
+  est estimée d'après le plan et signalée comme telle (inconnue tant qu'on n'a pas vu un arrêt).
+- **Analyse de toutes les voitures** : les heures de départ de chaque tour viennent de LMU, au
+  centième, aussi quand on roule soi-même. Rejoint en cours de course, les tours d'avant
+  l'arrivée sont placés sur la courbe sans fausser le rythme ni les arrêts.
+- Le prochain arrêt suit les arrêts réellement faits.
+
 ## 4.5.1
 
 - **Overlay, télémétrie** : fantôme masqué, plus aucune comparaison (pédales, rapport, vitesse

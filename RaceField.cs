@@ -34,6 +34,7 @@ namespace User.TeamPace
         public double LastLap;                             // time of the last lap (0 = unknown)
         public List<int> PitLaps = new List<int>();        // laps LMU flagged as pit laps
         public List<FieldSwap> Swaps = new List<FieldSwap>();
+        public int KnownFrom;                              // live, seen after the start: laps before this one are estimated
     }
 
     public class FieldSwap
@@ -216,14 +217,16 @@ namespace User.TeamPace
             run.Start = n > 0 ? car.Starts[0] : 0;
             run.End = n > 0 ? (dur[n - 1] > 0 ? car.Starts[n - 1] + dur[n - 1] : car.Starts[n - 1]) : 0;
 
+            // Laps estimated before the car was seen (live) say nothing of its pace or its stops
+            int first = Math.Max(1, car.KnownFrom);
             var sample = new List<double>();
-            for (int i = 1; i < n; i++) if (dur[i] > 0) sample.Add(dur[i]);
+            for (int i = first; i < n; i++) if (dur[i] > 0) sample.Add(dur[i]);
             if (sample.Count == 0) return run;
             sample.Sort();
             run.Pace = sample[sample.Count / 2];
 
             var pits = new HashSet<int>(car.PitLaps);
-            int k = 1;   // lap 1 (standing start) is never compared
+            int k = first;   // lap 1 (standing start) is never compared
             while (k < n)
             {
                 if (!(dur[k] > run.Pace + SlowMargin)) { k++; continue; }

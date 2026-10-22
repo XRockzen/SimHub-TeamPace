@@ -63,7 +63,7 @@ namespace User.TeamPace
             public int Done, StintLaps, LiveLap = -1;
             public double TimeLeft = double.NaN, StintTime = double.NaN, LastLap = double.NaN, Pace = double.NaN, PlannedPace = double.NaN;
             public double Fuel, PerLap = double.NaN, Tank = 100;
-            public bool PerLapMeasured, Energy;
+            public bool PerLapMeasured, Energy, FuelEstimated;
             public List<StrategyEngine.StopPlan> Stops = new List<StrategyEngine.StopPlan>();
             public int FirstNumber;
             public int PlanLap;   // lap of the next stop in the original plan, when the live plan moved it
@@ -82,13 +82,15 @@ namespace User.TeamPace
             d.Done = OverlayService.Lap - 1;
             d.LiveLap = OverlayService.LiveSim != null ? OverlayService.LiveLap : -1;
             d.TimeLeft = OverlayService.SessionLeft > 0 ? OverlayService.SessionLeft : double.NaN;
-            d.Driver = OverlayService.LiveSim != null && OverlayService.LiveSim.Stints.Count > 0 ? OverlayService.LiveSim.Stints[0].Driver : race.DriverOf(OverlayService.RaceStops);
+            d.Driver = OverlayService.Spectating && OverlayService.CarDriver.Length > 0 ? OverlayService.CarDriver
+                     : OverlayService.LiveSim != null && OverlayService.LiveSim.Stints.Count > 0 ? OverlayService.LiveSim.Stints[0].Driver : race.DriverOf(OverlayService.RaceStops);
+            d.FuelEstimated = OverlayService.FuelEstimated;
             d.PlannedPace = race.PaceOf(d.Driver);
             d.StintLaps = OverlayService.StintLaps;
             double rt = OverlayService.RaceTime;
             d.StintTime = double.IsNaN(rt) ? double.NaN : rt - OverlayService.StintStart;
             d.Recent = OverlayService.RecentLaps;
-            d.LastLap = d.Recent.Length > 0 ? d.Recent[d.Recent.Length - 1] : double.NaN;
+            d.LastLap = d.Recent.Length > 0 ? d.Recent[d.Recent.Length - 1] : OverlayService.Spectating ? OverlayService.CarLastLap : double.NaN;
             d.Pace = OverlayService.LivePace;
             d.Fuel = OverlayService.Fuel;
             d.Tank = Math.Max(1, race.Plan.TankL);
@@ -96,6 +98,8 @@ namespace User.TeamPace
             d.PerLap = d.PerLapMeasured ? OverlayService.LiveFuel : race.FuelPerLap;
             d.Energy = sim.EnergyMode;
             int j = sim.Stops.FindIndex(st => st.Lap > d.Done);
+            // The original plan, not recalculated yet: the next stop is the one after those made
+            if (sim == race.Sim && OverlayService.RaceStops > 0 && OverlayService.IsRace) j = OverlayService.RaceStops < sim.Stops.Count ? Math.Max(j, OverlayService.RaceStops) : -1;
             if (j >= 0)
             {
                 for (int k = j; k < sim.Stops.Count; k++) d.Stops.Add(sim.Stops[k]);
@@ -143,24 +147,25 @@ namespace User.TeamPace
             double x = 12;
             T(dc, "RELAIS EN COURS", x, 36, 11, Muted);
             T(dc, d.Driver ?? "—", x, 50, 22, Text, true);
-            T(dc, string.Format("{0} tour{1}{2}", d.StintLaps, d.StintLaps > 1 ? "s" : "", double.IsNaN(d.StintTime) ? "" : " · " + Fmt.TotalTime(TimeSpan.FromSeconds(d.StintTime))), x, 80, 13, Muted);
+            T(dc, d.StintLaps < 0 || double.IsNaN(d.StintTime) ? "relais commencé avant votre arrivée"
+                  : string.Format("{0} tour{1} · {2}", d.StintLaps, d.StintLaps > 1 ? "s" : "", Fmt.TotalTime(TimeSpan.FromSeconds(d.StintTime))), x, 80, 13, Muted);
             T(dc, "dernier : " + Lap(d.LastLap), x, 100, 13, double.IsNaN(d.LastLap) || double.IsNaN(d.PlannedPace) ? Text : d.LastLap <= d.PlannedPace + 0.2 ? Green : Red);
             T(dc, "moyenne " + Lap(d.Pace) + " · prévu " + Lap(d.PlannedPace), x, 120, 12, Faint);
 
             // 2. Fuel
             x = 12 + cw + 12;
             var next = d.Stops.Count > 0 ? d.Stops[0] : null;
-            int toGo = next != null ? next.Lap - d.Done : 0;
-            T(dc, "ESSENCE", x, 36, 11, Muted);
-            T(dc, d.Fuel.ToString("0", Fr) + " L", x, 50, 22, Text, true);
+            int toGo = next != null ? Math.Max(0, next.Lap - d.Done) : 0;
+            T(dc, d.FuelEstimated ? "ESSENCE · ESTIMÉE" : "ESSENCE", x, 36, 11, d.FuelEstimated ? Amber : Muted);
+            T(dc, double.IsNaN(d.Fuel) ? "—" : (d.FuelEstimated ? "≈ " : "") + d.Fuel.ToString("0", Fr) + " L", x, 50, 22, Text, true);
             double bw = cw - 24;
             dc.DrawRoundedRectangle(Track, null, new Rect(x, 82, bw, 8), 4, 4);
-            dc.DrawRoundedRectangle(Blue, null, new Rect(x, 82, bw * Math.Max(0, Math.Min(1, d.Fuel / d.Tank)), 8), 4, 4);
+            if (!double.IsNaN(d.Fuel)) dc.DrawRoundedRectangle(Blue, null, new Rect(x, 82, bw * Math.Max(0, Math.Min(1, d.Fuel / d.Tank)), 8), 4, 4);
             if (!double.IsNaN(d.PerLap) && d.PerLap > 0)
             {
                 if (toGo > 0) dc.DrawRectangle(Amber, null, new Rect(x + bw * Math.Min(1, toGo * d.PerLap / d.Tank) - 1, 79, 2, 14));
-                T(dc, string.Format(Fr, "{0:0.00} L/tour {1}", d.PerLap, d.PerLapMeasured ? "mesurés" : "prévus"), x, 98, 12.5, Muted);
-                if (toGo > 0)
+                T(dc, double.IsNaN(d.Fuel) ? "inconnue jusqu'au prochain arrêt" : string.Format(Fr, "{0:0.00} L/tour {1}", d.PerLap, d.PerLapMeasured ? "mesurés" : "prévus"), x, 98, 12.5, Muted);
+                if (toGo > 0 && !double.IsNaN(d.Fuel))
                 {
                     double margin = d.Fuel / d.PerLap - toGo;
                     T(dc, "marge " + Signed(margin, "0.0") + " tour", x, 118, 13, margin >= 0.3 ? Green : margin >= 0 ? Amber : Red, true);
