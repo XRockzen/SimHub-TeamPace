@@ -32,7 +32,8 @@ namespace User.TeamPace
         private string _sessionId           = null;   // our own session GUID
 
         private readonly LmuLiveTracker _liveTracker = new LmuLiveTracker();
-        private bool _overlayFailed;
+        private bool _overlayFailed, _memoryFailed;
+        private bool _lapInvalid;   // LMU flagged the lap under way as invalid
 
         public TeamPacePlugin()
         {
@@ -103,6 +104,13 @@ namespace User.TeamPace
 
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
         {
+            if (data.GameName == "LMU")
+            {
+                // LMU's own memory, read once for the whole frame
+                try { LmuLive.Tick(); }
+                catch (Exception ex) { LmuLive.State = null; if (!_memoryFailed) { _memoryFailed = true; SimHub.Logging.Current.Error("[TeamPace] LMU memory: " + ex); } }
+                if (LmuLive.Driving && LmuLive.Us.LapInvalid) _lapInvalid = true;
+            }
             if (data.GameRunning && data.GameName == "LMU")
                 _liveTracker.Update(data);
             if (data.GameName == "LMU")
@@ -149,6 +157,7 @@ namespace User.TeamPace
             {
                 _sessionId           = Guid.NewGuid().ToString("N");
                 _lastCompletedLaps   = -1;
+                _lapInvalid          = false;
                 _lastTrackForSession = lapTrack;
             }
 
@@ -163,7 +172,9 @@ namespace User.TeamPace
             if (_lastCompletedLaps >= 0 && completedLaps > _lastCompletedLaps)
             {
                 TimeSpan lastLapTime = newData.LastLapTime;
-                bool isInvalid = lastLapTime.Ticks <= 0;
+                // LMU's own flag, raised during the lap, or no time for it
+                bool isInvalid = lastLapTime.Ticks <= 0 || _lapInvalid;
+                _lapInvalid = false;
 
                 if (isInvalid)
                 {

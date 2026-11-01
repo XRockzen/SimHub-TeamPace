@@ -43,7 +43,7 @@ namespace User.TeamPace
             if (string.IsNullOrEmpty(carClass)) return "?";
             switch (Normalize(carClass))
             {
-                case "HYPERCAR": return "HYP";
+                case "HYPERCAR": return "Hyper";   // LMU's own name, kept in the saved plans
                 case "LMP2":     return "LMP2";
                 case "LMPEELMS": return "LMP2 ELMS";
                 case "LMP3":     return "LMP3";
@@ -60,7 +60,8 @@ namespace User.TeamPace
         {
             if (string.IsNullOrEmpty(carClass)) return "";
             var u = carClass.ToUpperInvariant().Replace(" ", "").Replace("-", "").Replace("_", "");
-            if (u.Contains("HYPERCAR") || u == "H") return "HYPERCAR";
+            // LMU writes "Hyper" in its results and its live memory
+            if (u.Contains("HYPER") || u == "H" || u == "LMH" || u == "LMDH") return "HYPERCAR";
             if (u.Contains("LMPEELMS") || u.Contains("ELMS")) return "LMPEELMS";
             if (u.Contains("LMP2"))   return "LMP2";
             if (u.Contains("LMP3"))   return "LMP3";

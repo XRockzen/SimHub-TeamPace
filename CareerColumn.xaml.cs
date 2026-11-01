@@ -22,7 +22,26 @@ namespace User.TeamPace
         {
             _driver = driver;
             InitializeComponent();
-            Unloaded += (s, e) => _activity.Detach();
+            Unloaded += (s, e) => { _activity.Detach(); PeriodChanged -= OnPeriod; };
+            Loaded += (s, e) => { PeriodChanged -= OnPeriod; PeriodChanged += OnPeriod; };
+            _activity.RangeHandles = true;
+            _activity.RangeChanged += () =>
+            {
+                // The same period in every driver's column, kept while the plugin runs
+                _from = _activity.ViewFrom; _to = _activity.ViewTo;
+                var h = PeriodChanged;
+                if (h != null) h(this);
+            };
+        }
+
+        private static DateTime? _from, _to;
+        private static event Action<CareerColumn> PeriodChanged;
+
+        private void OnPeriod(CareerColumn source)
+        {
+            if (source == this) return;
+            _activity.ViewFrom = _from; _activity.ViewTo = _to;
+            _activity.SetMode(_activity.UseHours);
         }
 
         // ─── Data ─────────────────────────────────────────────────────────────
@@ -62,6 +81,8 @@ namespace User.TeamPace
 
             _activity.ScaleMinDate  = scaleMin;
             _activity.ScaleMaxValue = scaleMax;
+            _activity.ViewFrom      = _from;
+            _activity.ViewTo        = _to;
             _activity.Attach(ActivityCanvas, BuildActivity(sessions));
             _activity.SetMode(true);
             _activity.RenderLegend(ActivityLegend);

@@ -62,7 +62,7 @@ namespace User.TeamPace
         }
 
         /// <summary>The measures with what the race shows so far for the driver in the car: pace and consumption.</summary>
-        public StrategyEngine.Measures LiveMeasures(double pace, double fuel, int stint)
+        public StrategyEngine.Measures LiveMeasures(double pace, double fuel, double energy, int stint)
         {
             var m = new StrategyEngine.Measures { Team = Measures.Team, CornerShare = Measures.CornerShare };
             string current = DriverOf(stint);
@@ -76,11 +76,14 @@ namespace User.TeamPace
                     if (!double.IsNaN(pace)) dd.Values[StrategyEngine.Pace].Value = pace;
                     if (!double.IsNaN(fuel))
                     {
-                        // The virtual energy goes with the fuel actually burnt
                         double old = dd.Values[StrategyEngine.Fuel].Value;
                         dd.Values[StrategyEngine.Fuel].Value = fuel;
-                        if (old > 0 && dd.Values[StrategyEngine.Energy].Value > 0) dd.Values[StrategyEngine.Energy].Value *= fuel / old;
+                        // The virtual energy as LMU measures it; else in proportion to the fuel actually burnt
+                        if (dd.Values[StrategyEngine.Energy].Value > 0)
+                            dd.Values[StrategyEngine.Energy].Value = !double.IsNaN(energy) ? energy
+                                : old > 0 ? dd.Values[StrategyEngine.Energy].Value * fuel / old : dd.Values[StrategyEngine.Energy].Value;
                     }
+                    else if (!double.IsNaN(energy) && dd.Values[StrategyEngine.Energy].Value > 0) dd.Values[StrategyEngine.Energy].Value = energy;
                 }
                 m.Drivers.Add(dd);
             }
@@ -137,11 +140,11 @@ namespace User.TeamPace
         // The race as it goes: the plan recalculated at the end of each lap from where the race stands
         public static volatile StrategyEngine.Simulation LiveSim;
         public static int LiveLap = -1, RaceStops, StintLaps;
-        public static double LivePace = double.NaN, LiveFuel = double.NaN, StintStart;
+        public static double LivePace = double.NaN, LiveFuel = double.NaN, LiveEnergy = double.NaN, StintStart;
         public static double[] RecentLaps = new double[0];   // the last laps of the race, s (a fresh array each lap: safe to read)
-        private static readonly List<double> RaceLaps = new List<double>(), RaceFuel = new List<double>();
+        private static readonly List<double> RaceLaps = new List<double>(), RaceFuel = new List<double>(), RaceEnergy = new List<double>();
         private static bool _inLane, _pitThisLap, _wasRace;
-        private static double _lapStartFuel = -1;
+        private static double _lapStartFuel = -1, _lapStartEnergy = -1;
         private static int _tyreLap;
 
         /// <summary>Race time from the time left in a timed race; NaN when unknown.</summary>
@@ -193,21 +196,21 @@ namespace User.TeamPace
 
         public static void Update(GameData data)
         {
+            // LMU's own memory first: the same values whether one drives or watches a teammate
+            var st = LmuLive.State;
+            if (st != null && !(data.GameRunning && data.GameReplay)) { FromMemory(st, LmuLive.Us, LmuLive.FullFrame, LmuLive.Driving); return; }
             var d = data.NewData;
-            if (!data.GameRunning || d == null || data.GameInMenu || data.GameReplay)
-            {
-                // SimHub reads nothing while one watches a teammate: LMU's own memory still has the race
-                Spectate();
-                return;
-            }
+            if (!data.GameRunning || d == null || data.GameInMenu || data.GameReplay) { _running = false; Spectating = false; return; }
             _running = true;
             _lastFrame = Now;
             Demo = false;
             Spectating = false;
             FuelEstimated = false;
+            Energy = double.NaN;
             var s = OverlaySettings.Current;
             if (!s.Enabled && !s.PitwallEnabled && !EditMode && !PitEditMode) return;   // nothing computed while both are off
 
+            // SimHub's values: only while LMU's memory cannot be read
             var track = d.TrackName ?? "";
             var cls = d.CarClass ?? "";
             if (!string.Equals(track, _track, StringComparison.Ordinal) || !string.Equals(cls, _cls, StringComparison.Ordinal))
@@ -224,29 +227,12 @@ namespace User.TeamPace
                     : d.SessionTypeName != null && d.SessionTypeName.IndexOf("qual", StringComparison.OrdinalIgnoreCase) >= 0 ? SessionKind.Qualifying
                     : SessionKind.Practice;
             if (IsRace != _wasRace) { _wasRace = IsRace; ResetRace(); }
-            if (IsRace && (s.PitwallEnabled || PitEditMode))
-            {
-                // Every car, for the pitwall's analysis: from LMU's memory (exact lap starts), else SimHub's opponents
-                if (++_memFrame % 6 == 0)
-                {
-                    var st = LmuMemory.Read(_mem);
-                    if (st != null)
-                    {
-                        if (!_fieldFromMemory) { LiveField.Reset(); _fieldFromMemory = true; }
-                        _mem = st;
-                        LiveField.Update(st, OurCar(st));
-                    }
-                }
-                if (!_fieldFromMemory) LiveField.Update(d.Opponents);
-            }
+            if (IsRace && (s.PitwallEnabled || PitEditMode) && !_fieldFromMemory) LiveField.Update(d.Opponents);
             // Pit stops of the race: counted at the lane entry, the stint restarts at the exit
             bool lane = d.IsInPitLane != 0;
             if (IsRace && lane && !_inLane && d.SpeedKmh > 5)
             {
-                var live = LiveSim;
-                var race = _race;
-                int wheels = live != null && live.Stops.Count > 0 ? live.Stops[0].Wheels
-                           : race != null && race.Sim != null && RaceStops < race.Sim.Stops.Count ? race.Sim.Stops[RaceStops].Wheels : 0;
+                int wheels = PlannedWheels(RaceStops);
                 RaceStops++;
                 _pitThisLap = true;
                 if (wheels != 0) _tyreLap = d.CompletedLaps;
@@ -257,47 +243,35 @@ namespace User.TeamPace
                  d.Throttle, d.Brake, d.SpeedKmh, d.Gear ?? "", s);
         }
 
-        // ─── Watching a teammate: LMU's shared memory ─────────────────────────
+        // ─── LMU's shared memory: driving, or watching a teammate ─────────────
 
-        public static volatile bool Spectating;   // our car driven by a teammate, read from LMU's memory
+        public static volatile bool Spectating;   // our car driven by a teammate: only part of its telemetry is published
         public static bool FuelEstimated;         // its fuel is not published: estimated from the plan
+        public static double Energy = double.NaN; // virtual energy left, %, when LMU publishes it (our car, driven here)
         public static string CarDriver = "";      // who drives our car
         public static double CarLastLap = double.NaN;
-        private static LmuState _mem;
-        private static LmuCar _us;
-        private static int _memFrame, _fuelStopLap = -1;
-        private static bool _fieldFromMemory;
-        private static volatile HashSet<string> _teamNames;
-        private static bool _namesLoading;
+        private static int _fuelStopLap = -1, _laneStops, _laneStopIndex;
+        private static bool _fieldFromMemory, _laneStop;
+        private static readonly double[] _laneWear = new double[4];
         private static readonly string[] Gears = { "R", "N", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 
-        private static void Spectate()
+        private static void FromMemory(LmuState m, LmuCar us, bool full, bool driving)
         {
             var s = OverlaySettings.Current;
             if (!s.Enabled && !s.PitwallEnabled && !EditMode && !PitEditMode) { _running = false; return; }
-            bool full = _us == null || ++_memFrame % 6 == 0;   // every car 10 times a second, ours at every frame
-            if (full)
-            {
-                var st = LmuMemory.Read(_mem);
-                if (st == null) { _running = false; Spectating = false; return; }
-                _mem = st;
-                _us = OurCar(st);
-            }
-            else if (!LmuMemory.Refresh(_mem, _us)) { _us = null; return; }
-            var m = _mem;
             _running = true;
             _lastFrame = Now;
             Demo = false;
-            Spectating = true;
+            Spectating = !driving;
 
-            string track = m.Track, cls = _us != null ? _us.Class : "";
+            string track = m.Track, cls = us != null ? us.Class : "";
             if (!string.Equals(track, _track, StringComparison.Ordinal) || !string.Equals(cls, _cls, StringComparison.Ordinal))
             {
                 _track = track; _cls = cls; TrackLive = track;
                 ResetSession();
                 RequestReference();
             }
-            SessionLeft = m.EndET > 0 ? m.EndET - m.ET : 0;
+            SessionLeft = m.TimeLeft;
             IsRace = m.IsRace;
             Session = IsRace ? SessionKind.Race : m.IsQualifying ? SessionKind.Qualifying : SessionKind.Practice;
             if (IsRace != _wasRace)
@@ -305,58 +279,65 @@ namespace User.TeamPace
                 _wasRace = IsRace;
                 ResetRace();
             }
-            if (_us != null && _us.Pitstops > RaceStops) RaceStops = _us.Pitstops;   // LMU counts the stops made
-            if (full && IsRace && (s.PitwallEnabled || PitEditMode)) { _fieldFromMemory = true; LiveField.Update(m, _us); }
-            if (_us == null) { CarDriver = ""; return; }   // our car is not in this session: the field only
-            CarDriver = _us.Driver;
-            CarLastLap = _us.LastLap > 0 ? _us.LastLap : double.NaN;
+            if (full && IsRace && (s.PitwallEnabled || PitEditMode))
+            {
+                if (!_fieldFromMemory) { LiveField.Reset(); _fieldFromMemory = true; }
+                LiveField.Update(m, us);
+            }
+            if (us == null) { CarDriver = ""; return; }   // our car is not in this session: the field only
+            CarDriver = us.Driver;
+            CarLastLap = us.LastLap > 0 ? us.LastLap : double.NaN;
+            if (IsRace && us.Pitstops > RaceStops) RaceStops = us.Pitstops;   // LMU counts the stops made
 
-            // Stops: the lane entry counts one, the stint and the fuel restart at the exit
-            bool lane = _us.InPits;
+            // Stops: LMU says when the car stands in its box (a drive-through is none); the stint restarts at the lane exit
+            bool lane = us.InPits;
             if (IsRace && lane && !_inLane)
             {
-                var live = LiveSim;
-                var race = _race;
-                int wheels = live != null && live.Stops.Count > 0 ? live.Stops[0].Wheels
-                           : race != null && race.Sim != null && RaceStops < race.Sim.Stops.Count ? race.Sim.Stops[RaceStops].Wheels : 0;
-                RaceStops = Math.Max(RaceStops + 1, _us.Pitstops);
-                if (_us.Pitstops > 0) RaceStops = _us.Pitstops;
                 _pitThisLap = true;
-                if (wheels != 0) _tyreLap = _us.Laps;
+                _laneStop = false;
+                _laneStops = us.Pitstops;
+                _laneStopIndex = RaceStops;
+                Array.Copy(us.Wear, _laneWear, 4);
             }
-            if (IsRace && !lane && _inLane) { StintStart = RaceTime; StintLaps = 0; _fuelStopLap = _us.Laps; }
+            if (IsRace && lane && !_laneStop && us.PitState == LmuCar.PitStopped) Stop(us);
+            if (IsRace && !lane && _inLane)
+            {
+                if (!_laneStop && us.Pitstops > _laneStops) Stop(us);
+                if (_laneStop)
+                {
+                    StintStart = RaceTime; StintLaps = 0; _fuelStopLap = us.Laps;
+                    // Driven here: the tyres changed show in their wear; else the plan's
+                    if (driving && us.Wear[0] + us.Wear[1] + us.Wear[2] + us.Wear[3] > 0)
+                    {
+                        for (int i = 0; i < 4; i++) if (Math.Abs(us.Wear[i] - _laneWear[i]) > 0.02) { _tyreLap = us.Laps; break; }
+                    }
+                    else if (PlannedWheels(_laneStopIndex) != 0) _tyreLap = us.Laps;
+                }
+            }
             _inLane = lane;
 
-            FuelEstimated = true;
-            Fuel = EstimateFuel(_us.Laps);
-            int g = _us.Gear + 1;
-            Feed(_us.LapDist, 0, m.ET - _us.LapStartET, _us.LastLap, _us.Laps,
-                 _us.Throttle * 100, _us.Brake * 100, _us.Speed, g >= 0 && g < Gears.Length ? Gears[g] : "", s);
+            FuelEstimated = !driving;
+            Fuel = driving ? us.Fuel : EstimateFuel(us.Laps);
+            Energy = driving && us.Energy > 0 ? us.Energy * 100 : double.NaN;
+            int g = us.Gear + 1;
+            Feed(us.LapDist, 0, m.ET - us.LapStartET, us.LastLap, us.Laps,
+                 us.Throttle * 100, us.Brake * 100, us.Speed, g >= 0 && g < Gears.Length ? Gears[g] : "", s);
         }
 
-        /// <summary>
-        /// Our car: the player's when he drives it, else the one a teammate (or the player) is
-        /// driving, by name.
-        /// </summary>
-        private static LmuCar OurCar(LmuState st)
+        /// <summary>The car stands in its box: one more stop (LMU's count when it already has it).</summary>
+        private static void Stop(LmuCar us)
         {
-            if (st.PlayerHasVehicle && st.PlayerIndex >= 0 && st.PlayerIndex < st.Cars.Count) return st.Cars[st.PlayerIndex];
-            var names = _teamNames;
-            if (names == null && !_namesLoading)
-            {
-                _namesLoading = true;
-                Task.Run(() =>
-                {
-                    var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    try { foreach (var td in LmuTeamSync.GetDrivers()) set.Add(td.Name.Trim()); }
-                    catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Team names: " + ex.Message); }
-                    _teamNames = set;
-                });
-            }
-            foreach (var c in st.Cars)
-                if (string.Equals(c.Driver.Trim(), st.PlayerName.Trim(), StringComparison.OrdinalIgnoreCase) || (names != null && names.Contains(c.Driver.Trim())))
-                    return c;
-            return null;
+            _laneStop = true;
+            RaceStops = us.Pitstops > _laneStops ? Math.Max(RaceStops, us.Pitstops) : RaceStops + 1;
+        }
+
+        /// <summary>The wheels the plan (recalculated or not) changes at a stop of the race.</summary>
+        private static int PlannedWheels(int stop)
+        {
+            var live = LiveSim;
+            var race = _race;
+            return live != null && live.Stops.Count > 0 ? live.Stops[0].Wheels
+                 : race != null && race.Sim != null && stop < race.Sim.Stops.Count ? race.Sim.Stops[stop].Wheels : 0;
         }
 
         /// <summary>
@@ -420,13 +401,14 @@ namespace User.TeamPace
 
         private static void ResetRace()
         {
-            RaceLaps.Clear(); RaceFuel.Clear(); RecentLaps = new double[0];
+            RaceLaps.Clear(); RaceFuel.Clear(); RaceEnergy.Clear(); RecentLaps = new double[0]; _lapStartEnergy = -1;
             LiveField.Reset();
             RaceStops = 0; StintLaps = 0; StintStart = 0; _tyreLap = 0; _lapStartFuel = -1; _pitThisLap = false; _fuelStopLap = -1; _fieldFromMemory = false;
-            LiveSim = null; LiveLap = -1; LivePace = LiveFuel = double.NaN;
+            LiveSim = null; LiveLap = -1; LivePace = LiveFuel = LiveEnergy = double.NaN;
             // Watching a race already under way: the stint and the fuel are unknown until the next stop
-            if (Spectating && (_us == null || _us.Laps > 0)) { StintStart = double.NaN; StintLaps = -1; }
-            if (Spectating && _us != null) RaceStops = _us.Pitstops;
+            var us = LmuLive.Us;
+            if (Spectating && (us == null || us.Laps > 0)) { StintStart = double.NaN; StintLaps = -1; }
+            if (LmuLive.State != null && us != null) RaceStops = us.Pitstops;
         }
 
         private static void ResetSession()
@@ -583,6 +565,9 @@ namespace User.TeamPace
                 if (lapSec > 0 && !_pitThisLap) RaceLaps.Add(lapSec);
                 if (!FuelEstimated && _lapStartFuel >= 0 && !_pitThisLap && _lapStartFuel - Fuel > 0.05) RaceFuel.Add(_lapStartFuel - Fuel);
                 _lapStartFuel = Fuel;
+                // The virtual energy burnt, read from LMU (our car, driven here)
+                if (!double.IsNaN(Energy) && _lapStartEnergy >= 0 && !_pitThisLap && _lapStartEnergy - Energy > 0.05) RaceEnergy.Add(_lapStartEnergy - Energy);
+                _lapStartEnergy = double.IsNaN(Energy) ? -1 : Energy;
                 _pitThisLap = false;
                 if (StintLaps >= 0) StintLaps++;
                 int k = Math.Min(8, RaceLaps.Count);
@@ -611,17 +596,17 @@ namespace User.TeamPace
             {
                 Time = time, Lap = completed, StopsDone = RaceStops, Fuel = Fuel,
                 StintTime = double.IsNaN(StintStart) ? 0 : Math.Max(0, time - StintStart), LapsOnTyres = Math.Max(0, completed - _tyreLap),
-                TyresUsed = race.TyresUsedAfter(RaceStops),
+                TyresUsed = race.TyresUsedAfter(RaceStops), Energy = Energy,
             };
-            double pace = Recent(RaceLaps, 10, 3), fuel = Recent(RaceFuel, 10, 2);
+            double pace = Recent(RaceLaps, 10, 3), fuel = Recent(RaceFuel, 10, 2), energy = Recent(RaceEnergy, 10, 2);
             int stops = RaceStops;
             Task.Run(() =>
             {
                 try
                 {
-                    var sim = StrategyEngine.Resume(race.Plan, race.LiveMeasures(pace, fuel, stops), state);
+                    var sim = StrategyEngine.Resume(race.Plan, race.LiveMeasures(pace, fuel, energy, stops), state);
                     if (sim.Stints.Count == 0) return;
-                    LivePace = pace; LiveFuel = fuel; LiveLap = completed;
+                    LivePace = pace; LiveFuel = fuel; LiveEnergy = energy; LiveLap = completed;
                     LiveSim = sim;
                 }
                 catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Live strategy: " + ex.Message); }

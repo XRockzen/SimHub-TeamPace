@@ -116,7 +116,8 @@
 
         <StackPanel Grid.Row="3" Margin="0,8,0,0">
             <TextBlock Text="ACTIVITÉ (heures par semaine)" Style="{StaticResource SectionLbl}"/>
-            <Canvas x:Name="ActivityCanvas" Height="120" ClipToBounds="True"/>
+            <Canvas x:Name="ActivityCanvas" Height="140" ClipToBounds="True" Background="Transparent"
+                    ToolTip="Tirez les poignées sous le graphique pour choisir la période, double-cliquez la barre pour tout revoir"/>
             <WrapPanel x:Name="ActivityLegend" Margin="32,4,0,0" MaxHeight="40"/>
         </StackPanel>
     </Grid>

@@ -3,6 +3,33 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.7.0
+
+- **Les vraies données de LMU, plus de déductions.** TeamPace lit maintenant la mémoire partagée de
+  LMU telle que Studio 397 la documente dans son kit officiel, au volant comme en spectateur, et ne
+  passe plus par SimHub que si elle est indisponible. La lecture se fait d'un bloc sous le verrou
+  de LMU (plus de valeurs à moitié écrites), sans jamais faire attendre le jeu.
+  - **Énergie virtuelle** lue en direct : le recalcul de la stratégie utilise votre vraie
+    consommation d'énergie par tour au lieu de la déduire de l'essence, et la page Course de
+    l'overlay montre l'énergie restante et sa marge.
+  - **Arrêts** : un arrêt compte quand LMU dit que la voiture est à l'arrêt dans son stand (un
+    passage par la voie des stands sans arrêt, comme un drive-through, n'en est plus un) ; le
+    temps arrêté vient de LMU.
+  - **Pneus** : usure par roue telle que LMU la donne ; un changement de pneus se voit à l'usure
+    revenue à neuf.
+  - **Pédales** : celles du pilote, avant l'antipatinage, comme dans la télémétrie de référence
+    (les coupures de l'antipatinage ne passent plus pour un lever de pied).
+  - **Type de session** (essais, qualif, course) et temps restant officiels.
+  - **Tour invalide** : le signal de LMU, en plus de l'absence de chrono.
+  - **Votre voiture en spectateur** : reconnue à son équipe et à sa voiture telles que LMU les
+    nomme, plus seulement au nom du pilote au volant.
+  - Le dossier de LMU est pris là où LMU l'indique quand il tourne.
+- **Activité : choisir la période.** Deux poignées sous le graphique d'activité de la Carrière : on
+  les tire pour ne garder que les derniers mois (ou n'importe quelle période), on fait glisser la
+  période entière, un double-clic sur la barre revient à tout l'historique. L'échelle s'adapte à la
+  période et la même période vaut pour tous les pilotes affichés.
+- **Hypercar en rouge** : l'étiquette de catégorie était grise, LMU écrivant « Hyper ».
+
 ## 4.6.0
 
 - **Overlay et pitwall en spectateur.** Quand on regarde un coéquipier rouler, SimHub ne reçoit

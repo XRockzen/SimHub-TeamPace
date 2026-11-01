@@ -40,6 +40,8 @@ namespace User.TeamPace
 
             // ── LMU categories ────────────────────────────────────────────────
             Badges.Add("HYPERCAR",  Badge("HY",   "#D32F2F", null, 0));
+            Badges.Add("Hyper",     Badge("HY",   "#D32F2F", null, 0));
+            Badges.Add("LMP2_ELMS", Badge("P2",   "#1565C0", "#FB8C00", 2));
             Badges.Add("LMGT3",     Badge("GT3",  "#2E7D32", null, 0));
             Badges.Add("GTE",       Badge("GTE",  "#E65100", null, 0));
             Badges.Add("LMP2",      Badge("P2",   "#1565C0", null, 0));

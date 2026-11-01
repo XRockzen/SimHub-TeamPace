@@ -36,7 +36,10 @@ namespace User.TeamPace
         public bool   FromGarage     { get; set; }   // lane passage started in the garage, not a stop
     }
 
-    /// <summary>Records per-lap fuel/tyre usage and pit stop timings from SimHub telemetry.</summary>
+    /// <summary>
+    /// Records per-lap fuel/tyre usage and pit stop timings: from LMU's memory when the car is
+    /// driven on this PC (its pit state says when the car stands in its box), else from SimHub.
+    /// </summary>
     public class LmuLiveTracker
     {
         private const double MaxTickSec     = 1.0;   // ignore gaps (pause, alt-tab)
@@ -70,35 +73,43 @@ namespace User.TeamPace
 
         public void Update(GameData data)
         {
-            var d   = data.NewData;
             var now = DateTime.UtcNow;
+            var us  = LmuLive.Us;
+            var tyre = _tyreBuf;   // two buffers swapped every tick: no allocation per frame
+            if (LmuLive.Driving)
+            {
+                // LMU's own values: fuel, wear (0..1, here in %), pit state and limiter
+                for (int i = 0; i < 4; i++) tyre[i] = us.Wear[i] * 100;
+                Tick(now, LmuLive.State.Track, us.Laps, us.Fuel, tyre, us.Speed, us.InPits, us.Limiter, us.PitState == LmuCar.PitStopped);
+                return;
+            }
+            var d = data.NewData;
             if (d == null || data.GamePaused || data.GameReplay || data.GameInMenu)
             {
                 _lastTick = DateTime.MinValue;
                 return;
             }
+            tyre[0] = d.TyreWearFrontLeft; tyre[1] = d.TyreWearFrontRight; tyre[2] = d.TyreWearRearLeft; tyre[3] = d.TyreWearRearRight;
+            Tick(now, d.TrackName ?? "", d.CompletedLaps, d.Fuel, tyre, d.SpeedKmh, d.IsInPitLane != 0, d.PitLimiterOn != 0, d.SpeedKmh < StoppedKmh);
+        }
 
+        private void Tick(DateTime now, string track, int completed, double fuel, double[] tyre, double speed, bool inLane, bool limiter, bool stopped)
+        {
             double dt = _lastTick == DateTime.MinValue ? 0 : (now - _lastTick).TotalSeconds;
             if (dt < 0 || dt > MaxTickSec) dt = 0;
             _lastTick = now;
 
-            var track     = d.TrackName ?? "";
-            int completed = d.CompletedLaps;
-
             if (track != _track || completed < _lastCompleted)
                 ResetSession(track);
 
-            AccumulateFuel(d.Fuel, _inLane);
-            // Two buffers swapped every tick: no allocation per frame
-            var tyre = _tyreBuf;
-            tyre[0] = d.TyreWearFrontLeft; tyre[1] = d.TyreWearFrontRight; tyre[2] = d.TyreWearRearLeft; tyre[3] = d.TyreWearRearRight;
-            AccumulateWear(tyre, _inLane && d.SpeedKmh < StoppedKmh);
-            TrackPit(d, now, dt, completed);
+            AccumulateFuel(fuel, _inLane);
+            AccumulateWear(tyre, _inLane && stopped);
+            TrackPit(inLane, speed, limiter, stopped, now, dt, completed);
 
             if (completed < 0) return;
 
             if (_lastCompleted >= 0 && completed > _lastCompleted && _lapStarted)
-                SaveLap(now, completed, d.Fuel);
+                SaveLap(now, completed, fuel);
 
             if (_lastCompleted < 0 || completed > _lastCompleted)
                 StartLap(now);
@@ -136,8 +147,7 @@ namespace User.TeamPace
             _prevFuel = fuel;
         }
 
-        // SimHub's wear convention differs per game (worn % or remaining %), so only
-        // the magnitude of the change is used; large steps are tyre changes.
+        // Worn or remaining, only the magnitude of the change is used; large steps are tyre changes.
         private void AccumulateWear(double[] tyre, bool stoppedInLane)
         {
             if (_prevTyre != null)
@@ -154,10 +164,8 @@ namespace User.TeamPace
             _prevTyre = tyre;
         }
 
-        private void TrackPit(StatusDataBase d, DateTime now, double dt, int completed)
+        private void TrackPit(bool inLane, double speed, bool limiter, bool stopped, DateTime now, double dt, int completed)
         {
-            bool inLane = d.IsInPitLane != 0;
-
             if (inLane && !_inLane)
             {
                 _pitEntry     = now;
@@ -169,12 +177,12 @@ namespace User.TeamPace
                 _lapInPit     = true;
                 // Escape → garage puts the car back in the lane at a standstill: driving out
                 // of the garage afterwards is a lane passage, not a pit stop.
-                _pitFromGarage = dt == 0 || d.SpeedKmh < GarageSpawnKmh;
+                _pitFromGarage = dt == 0 || speed < GarageSpawnKmh;
             }
             else if (inLane)
             {
-                if (d.SpeedKmh < StoppedKmh) _pitStopped += dt;
-                if (d.PitLimiterOn != 0)     _pitLimiter += dt;
+                if (stopped) _pitStopped += dt;
+                if (limiter) _pitLimiter += dt;
             }
             else if (_inLane)
             {

@@ -26,6 +26,13 @@ namespace User.TeamPace
 
         public static string AutoDiscoverResultsPath()
         {
+            // Where LMU says its data is, once it has been seen running
+            var user = LmuMemory.UserData;
+            if (!string.IsNullOrEmpty(user))
+            {
+                var results = Path.Combine(user, "Log", "Results");
+                if (Directory.Exists(results)) return results;
+            }
             foreach (var path in _candidatePaths)
                 if (Directory.Exists(path)) return path;
             return "";

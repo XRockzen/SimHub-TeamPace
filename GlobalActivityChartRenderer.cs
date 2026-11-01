@@ -104,6 +104,23 @@ namespace User.TeamPace
         public DateTime? ScaleMinDate  { get; set; }
         public double?   ScaleMaxValue { get; set; }
 
+        // Period shown: two handles under the chart, dragged to narrow it (null: from the first
+        // week, up to this week)
+        public bool      RangeHandles  { get; set; }
+        public DateTime? ViewFrom      { get; set; }
+        public DateTime? ViewTo        { get; set; }
+        /// <summary>The period was changed with the handles (on release).</summary>
+        public event Action RangeChanged;
+
+        private const double SliderH = 18;
+        private const int    MinWeeks = 4;
+        private List<DateTime> _allWeeks;
+        private int    _vFirst, _vLast;
+        private double _sliderY = -1, _chartW;
+        private int    _drag;   // 0 none, 1 left handle, 2 right handle, 3 the whole period
+        private double _dragX;
+        private int    _dragFirst, _dragLast;
+
         /// <summary>Highest weekly total for these laps, in the unit used by the chart.</summary>
         public static double MaxWeeklyValue(List<ActivityLap> laps, bool useHours)
         {
@@ -164,6 +181,8 @@ namespace User.TeamPace
             canvas.MouseMove           += OnMouseMove;
             canvas.MouseLeave          += OnMouseLeave;
             canvas.MouseLeftButtonDown += OnMouseLeftButtonDown;
+            canvas.MouseLeftButtonUp   += OnMouseLeftButtonUp;
+            canvas.LostMouseCapture    += OnLostCapture;
 
             Render();
         }
@@ -175,6 +194,8 @@ namespace User.TeamPace
             _canvas.MouseMove           -= OnMouseMove;
             _canvas.MouseLeave          -= OnMouseLeave;
             _canvas.MouseLeftButtonDown -= OnMouseLeftButtonDown;
+            _canvas.MouseLeftButtonUp   -= OnMouseLeftButtonUp;
+            _canvas.LostMouseCapture    -= OnLostCapture;
             _canvas = null;
         }
 
@@ -275,9 +296,13 @@ namespace User.TeamPace
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
+            var pos = e.GetPosition(_canvas);
+            if (_drag != 0) { Drag(pos.X); return; }
+            bool onSlider = InSlider(pos);
+            _canvas.Cursor = onSlider ? Cursors.SizeWE : null;
+            if (onSlider && _tooltip != null) { _tooltip.Visibility = Visibility.Collapsed; return; }
             if (_tooltip == null || _hitZones.Count == 0) return;
 
-            var pos = e.GetPosition(_canvas);
             HitZone? found = null;
             foreach (var hz in _hitZones)
                 if (pos.X >= hz.X1 && pos.X < hz.X2) { found = hz; break; }
@@ -331,6 +356,7 @@ namespace User.TeamPace
         private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             var pos     = e.GetPosition(_canvas);
+            if (InSlider(pos)) { StartDrag(pos.X, e.ClickCount); e.Handled = true; return; }
             string hit  = null;
 
             foreach (var bz in _barHitZones)
@@ -361,6 +387,118 @@ namespace User.TeamPace
             UpdateHighlight();
             var h = TrackClicked;
             if (h != null) h(_selectedTrack);
+        }
+
+        // ─── Period handles ───────────────────────────────────────────────────
+
+        private bool InSlider(Point pos)
+        {
+            return RangeHandles && _sliderY >= 0 && pos.Y >= _sliderY - 2 && pos.X >= ML - 8 && pos.X <= ML + _chartW + 8;
+        }
+
+        private double SliderX(int week) { return ML + _chartW * week / _allWeeks.Count; }
+
+        private void StartDrag(double x, int clicks)
+        {
+            if (clicks == 2)
+            {
+                // Double click: the whole timeline again
+                ViewFrom = ViewTo = null;
+                Render();
+                var h = RangeChanged;
+                if (h != null) h();
+                return;
+            }
+            double x1 = SliderX(_vFirst), x2 = SliderX(_vLast + 1);
+            _dragFirst = _vFirst; _dragLast = _vLast;
+            if (Math.Abs(x - x1) <= 8 && Math.Abs(x - x1) <= Math.Abs(x - x2)) { _drag = 1; _dragX = x1; }
+            else if (Math.Abs(x - x2) <= 8) { _drag = 2; _dragX = x2; }
+            else if (x > x1 && x < x2) { _drag = 3; _dragX = x; }
+            else { _drag = x < x1 ? 1 : 2; _dragX = x < x1 ? x1 : x2; }   // outside: the nearest handle jumps there
+            _canvas.CaptureMouse();
+            Drag(x);
+        }
+
+        private void Drag(double x)
+        {
+            int total = _allWeeks != null ? _allWeeks.Count : 0;
+            if (total < MinWeeks) return;
+            int dw = (int)Math.Round((x - _dragX) / (_chartW / total));
+            int f = _dragFirst, l = _dragLast;
+            if (_drag == 1) f = Math.Max(0, Math.Min(_dragFirst + dw, l - MinWeeks + 1));
+            else if (_drag == 2) l = Math.Min(total - 1, Math.Max(_dragLast + dw, f + MinWeeks - 1));
+            else
+            {
+                dw = Math.Max(-_dragFirst, Math.Min(dw, total - 1 - _dragLast));
+                f += dw; l += dw;
+            }
+            if (f == _vFirst && l == _vLast) return;
+            ViewFrom = f == 0 ? (DateTime?)null : _allWeeks[f];
+            ViewTo   = l == total - 1 ? (DateTime?)null : _allWeeks[l];   // the last week: follows the weeks to come
+            Render();
+        }
+
+        private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_drag == 0) return;
+            _canvas.ReleaseMouseCapture();
+        }
+
+        private void OnLostCapture(object sender, MouseEventArgs e)
+        {
+            if (_drag == 0) return;
+            _drag = 0;
+            Render();
+            var h = RangeChanged;
+            if (h != null) h();
+        }
+
+        /// <summary>The whole timeline under the chart, the period shown on it and its two handles.</summary>
+        private void DrawSlider(double ch)
+        {
+            int total = _allWeeks.Count;
+            double y = ch - SliderH / 2 - 1;
+            _sliderY = ch - SliderH;
+            double x1 = SliderX(_vFirst), x2 = SliderX(_vLast + 1);
+            var track = new Rectangle { Width = _chartW, Height = 4, RadiusX = 2, RadiusY = 2, Fill = new SolidColorBrush(Color.FromArgb(34, 255, 255, 255)) };
+            Canvas.SetLeft(track, ML); Canvas.SetTop(track, y - 2);
+            _canvas.Children.Add(track);
+            var span = new Rectangle { Width = Math.Max(2, x2 - x1), Height = 4, RadiusX = 2, RadiusY = 2, Fill = new SolidColorBrush(Color.FromArgb(170, 120, 180, 255)) };
+            Canvas.SetLeft(span, x1); Canvas.SetTop(span, y - 2);
+            _canvas.Children.Add(span);
+            foreach (double hx in new[] { x1, x2 })
+            {
+                var grip = new Border
+                {
+                    Width = 9, Height = 15, CornerRadius = new CornerRadius(3),
+                    Background = new SolidColorBrush(Color.FromArgb(240, 205, 225, 255)),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(255, 70, 120, 190)), BorderThickness = new Thickness(1),
+                    Child = new Rectangle { Width = 1, Height = 7, Fill = new SolidColorBrush(Color.FromArgb(160, 40, 60, 90)) },
+                };
+                Canvas.SetLeft(grip, hx - 4.5); Canvas.SetTop(grip, y - 7.5);
+                _canvas.Children.Add(grip);
+            }
+
+            // The period, while it is narrowed
+            if (_vFirst > 0 || _vLast < total - 1 || _drag != 0)
+            {
+                var from = _allWeeks[_vFirst];
+                string to = _vLast == total - 1 ? "aujourd'hui" : _allWeeks[_vLast].AddDays(6).ToString("d MMM yy");
+                int weeks = _vLast - _vFirst + 1;
+                var lbl = new TextBlock
+                {
+                    Text = string.Format("Du {0:d MMM yy} à {1} · {2} sem.{3}", from, to, weeks, _drag == 0 ? "  (double-clic sur la barre : tout)" : ""),
+                    FontSize = 9,
+                    Foreground = new SolidColorBrush(Color.FromArgb(220, 170, 205, 255)),
+                };
+                var pill = new Border
+                {
+                    Child = lbl, Padding = new Thickness(6, 1, 6, 2), CornerRadius = new CornerRadius(3), IsHitTestVisible = false,
+                    Background = new SolidColorBrush(Color.FromArgb(225, 22, 26, 36)),
+                };
+                Canvas.SetLeft(pill, ML + 4); Canvas.SetTop(pill, 0);
+                _canvas.Children.Add(pill);
+            }
         }
 
         // ─── Highlight engine ─────────────────────────────────────────────────
@@ -425,6 +563,7 @@ namespace User.TeamPace
             _trackColors.Clear();
             _tooltip     = null;
             _tooltipBody = null;
+            _sliderY     = -1;
 
             if (_laps == null || _laps.Count == 0) return;
 
@@ -438,7 +577,8 @@ namespace User.TeamPace
             if (cw < 30 || ch < 20) return;
 
             double chartW = cw - ML - MR;
-            double chartH = ch - MT - MB;
+            double chartH = ch - MT - MB - (RangeHandles ? SliderH : 0);
+            _chartW = chartW;
 
             // ── Group by week × track ─────────────────────────────────────────
             var weekData = new Dictionary<DateTime, Dictionary<string, double>>();
@@ -477,19 +617,38 @@ namespace User.TeamPace
             for (DateTime w = minW; w <= maxW; w = w.AddDays(7))
                 allWeeks.Add(w);
 
-            int totalWeeks = allWeeks.Count;
-            if (totalWeeks == 0) return;
+            if (allWeeks.Count == 0) return;
+
+            // ── Period shown (the handles), within the whole timeline ─────────
+            _allWeeks = allWeeks;
+            int vFirst = 0, vLast = allWeeks.Count - 1;
+            if (RangeHandles && allWeeks.Count >= MinWeeks)
+            {
+                if (ViewFrom.HasValue) vFirst = Math.Max(0, Math.Min(allWeeks.Count - 1, (int)((WeekStart(ViewFrom.Value) - minW).TotalDays / 7)));
+                if (ViewTo.HasValue)   vLast  = Math.Max(0, Math.Min(allWeeks.Count - 1, (int)((WeekStart(ViewTo.Value) - minW).TotalDays / 7)));
+                if (vLast - vFirst < MinWeeks - 1) { vFirst = Math.Max(0, Math.Min(vFirst, allWeeks.Count - MinWeeks)); vLast = vFirst + MinWeeks - 1; }
+            }
+            _vFirst = vFirst; _vLast = vLast;
+            bool whole = vFirst == 0 && vLast == allWeeks.Count - 1;
+            var weeks = allWeeks.GetRange(vFirst, vLast - vFirst + 1);
+            int totalWeeks = weeks.Count;
 
             // ── Y scale ───────────────────────────────────────────────────────
             double maxVal = 0;
-            foreach (var ws in allWeeks)
+            foreach (var ws in weeks)
             {
                 if (!weekData.ContainsKey(ws)) continue;
                 double total = 0;
                 foreach (var v in weekData[ws].Values) total += v;
                 if (total > maxVal) maxVal = total;
             }
-            if (ScaleMaxValue.HasValue && ScaleMaxValue.Value > maxVal) maxVal = ScaleMaxValue.Value;
+            if (whole && ScaleMaxValue.HasValue && ScaleMaxValue.Value > maxVal) maxVal = ScaleMaxValue.Value;   // a narrowed period: its own scale
+            if (maxVal <= 0 && RangeHandles && allWeeks.Count >= MinWeeks)
+            {
+                // Nothing driven in the period: the empty chart and its handles all the same
+                DrawSlider(ch);
+                return;
+            }
             if (maxVal <= 0) return;
 
             // ── Y grid ────────────────────────────────────────────────────────
@@ -540,7 +699,7 @@ namespace User.TeamPace
 
             for (int wi = 0; wi < totalWeeks; wi++)
             {
-                DateTime week   = allWeeks[wi];
+                DateTime week   = weeks[wi];
                 double   slotCX = ML + slotW * wi + slotW * 0.5;
                 double   slotX1 = ML + slotW * wi;
                 double   slotX2 = slotX1 + slotW;
@@ -634,6 +793,8 @@ namespace User.TeamPace
                     yBottom -= barH;
                 }
             }
+
+            if (RangeHandles && allWeeks.Count >= MinWeeks) DrawSlider(ch);
 
             // ── Tooltip overlay (must be last so it renders on top) ───────────
             _tooltipBody = new TextBlock

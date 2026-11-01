@@ -6,3 +6,7 @@ dist/
 *.suo
 *.db
 README.txt
+
+# Outils et réglages locaux (Claude)
+tools/
+.claude/settings.local.json

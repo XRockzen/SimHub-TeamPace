@@ -97,6 +97,7 @@ namespace User.TeamPace
                     if (!Cars.TryGetValue(key, out c)) { c = new Car(); Cars[key] = c; }
                     var f = c.Field;
                     f.Vehicle = lc.Vehicle; f.CarClass = lc.Class; f.Position = lc.Place; f.IsUs = lc == us;
+                    if (lc.Team.Length > 0) f.Team = lc.Team;
                     if (lc.Driver.Length > 0 && !f.Drivers.Contains(lc.Driver)) f.Drivers.Add(lc.Driver);   // a driver change adds a name
                     int laps = lc.Laps;   // completed; the lap under way is laps + 1
                     if (lc.LapStartET > 0 && laps >= 0)

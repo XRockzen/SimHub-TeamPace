@@ -403,17 +403,38 @@ namespace User.TeamPace
             double x = 12 + colW + 12;
             double tank = demo ? 100 : Math.Max(1, race.Plan.TankL);
             double perLap = demo ? 3.9 : !double.IsNaN(OverlayService.LiveFuel) ? OverlayService.LiveFuel : race.FuelPerLap;
-            T(dc, OverlayService.FuelEstimated ? "ESSENCE · ESTIMÉE" : "ESSENCE", x, 40, 11, OverlayService.FuelEstimated ? Amber : Muted);
-            T(dc, double.IsNaN(OverlayService.Fuel) ? "—" : (OverlayService.FuelEstimated ? "≈ " : "") + OverlayService.Fuel.ToString("0", Fr) + " L", x, 54, 24, Text, true);
-            double bw = colW - 24;
-            dc.DrawRoundedRectangle(Track, null, new Rect(x, 88, bw, 8), 4, 4);
-            if (!double.IsNaN(OverlayService.Fuel)) dc.DrawRoundedRectangle(Blue, null, new Rect(x, 88, bw * Math.Max(0, Math.Min(1, OverlayService.Fuel / tank)), 8), 4, 4);
-            if (!double.IsNaN(perLap) && perLap > 0 && toGo > 0 && !double.IsNaN(OverlayService.Fuel))
+            double ve = OverlayService.Energy;
+            if (!demo && !double.IsNaN(ve) && race.Sim != null && race.Sim.EnergyMode)
             {
-                double need = toGo * perLap;
-                dc.DrawRectangle(Amber, null, new Rect(x + bw * Math.Min(1, need / tank) - 1, 85, 2, 14));
-                double margin = OverlayService.Fuel / perLap - toGo;
-                T(dc, string.Format(Fr, "marge {0} tour", Signed(margin, "0.0")), x, 104, 12.5, margin >= 0.3 ? Green : margin >= 0 ? Amber : Red);
+                // Energy first: LMU's virtual energy left, against what the laps to the stop need
+                double vePerLap = OverlayService.LiveEnergy;
+                T(dc, "ÉNERGIE VIRTUELLE", x, 40, 11, Muted);
+                T(dc, ve.ToString("0", Fr) + " %", x, 54, 24, Text, true);
+                double vw = colW - 24;
+                dc.DrawRoundedRectangle(Track, null, new Rect(x, 88, vw, 8), 4, 4);
+                dc.DrawRoundedRectangle(Blue, null, new Rect(x, 88, vw * Math.Max(0, Math.Min(1, ve / 100)), 8), 4, 4);
+                if (!double.IsNaN(vePerLap) && vePerLap > 0 && toGo > 0)
+                {
+                    dc.DrawRectangle(Amber, null, new Rect(x + vw * Math.Min(1, toGo * vePerLap / 100) - 1, 85, 2, 14));
+                    double m = ve / vePerLap - toGo;
+                    T(dc, string.Format(Fr, "marge {0} tour", Signed(m, "0.0")), x, 104, 12.5, m >= 0.3 ? Green : m >= 0 ? Amber : Red);
+                }
+                else T(dc, string.Format(Fr, "{0:0} L d'essence", OverlayService.Fuel), x, 104, 12.5, Muted);
+            }
+            else
+            {
+                T(dc, OverlayService.FuelEstimated ? "ESSENCE · ESTIMÉE" : "ESSENCE", x, 40, 11, OverlayService.FuelEstimated ? Amber : Muted);
+                T(dc, double.IsNaN(OverlayService.Fuel) ? "—" : (OverlayService.FuelEstimated ? "≈ " : "") + OverlayService.Fuel.ToString("0", Fr) + " L", x, 54, 24, Text, true);
+                double bw = colW - 24;
+                dc.DrawRoundedRectangle(Track, null, new Rect(x, 88, bw, 8), 4, 4);
+                if (!double.IsNaN(OverlayService.Fuel)) dc.DrawRoundedRectangle(Blue, null, new Rect(x, 88, bw * Math.Max(0, Math.Min(1, OverlayService.Fuel / tank)), 8), 4, 4);
+                if (!double.IsNaN(perLap) && perLap > 0 && toGo > 0 && !double.IsNaN(OverlayService.Fuel))
+                {
+                    double need = toGo * perLap;
+                    dc.DrawRectangle(Amber, null, new Rect(x + bw * Math.Min(1, need / tank) - 1, 85, 2, 14));
+                    double margin = OverlayService.Fuel / perLap - toGo;
+                    T(dc, string.Format(Fr, "marge {0} tour", Signed(margin, "0.0")), x, 104, 12.5, margin >= 0.3 ? Green : margin >= 0 ? Amber : Red);
+                }
             }
 
             // 3. Against the plan

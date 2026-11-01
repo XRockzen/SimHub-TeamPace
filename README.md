@@ -163,6 +163,13 @@ Un **clic** sur une ligne fait ressortir ce circuit dans l'activité de chaque p
 semaine, une couleur par circuit) ; à l'inverse, un clic sur une barre de l'activité sélectionne sa
 ligne. Un **double-clic** ouvre la page du circuit ; pour changer de circuit, on revient à la Carrière.
 
+**Choisir la période de l'activité** : sous le graphique, deux poignées bornent la période
+affichée. Tirez celle de gauche vers la droite pour ne garder que les derniers mois, faites glisser
+la barre entre les deux pour décaler la période, double-cliquez sur la barre pour revoir tout
+l'historique. L'échelle s'adapte à la période, et la même période s'applique à tous les pilotes.
+
+![La période de l'activité](docs/images/19-activite-periode.png)
+
 ### Page circuit : progression
 
 ![Progression sur un circuit](docs/images/03-progression.png)
@@ -392,10 +399,11 @@ du rétroviseur central. Il a quatre pages, qu'on fait défiler avec les boutons
    (temps gagné ou perdu, point de freinage, vitesse mini) et vos derniers passages. En option,
    la consigne est **lue à voix haute** dans la ligne droite d'avant.
 3. **Course** : le plan de stratégie **recalculé à chaque fin de tour** : tours avant le prochain
-   arrêt, essence et marge, écart avec le plan, et à l'arrêt le pilote qui prend le relais, le
-   niveau et les pneus. Le recalcul repart de la course telle qu'elle est (temps restant, essence,
-   arrêts faits, temps déjà roulé dans le relais) avec le rythme et la consommation mesurés depuis
-   le départ (médiane des 10 derniers tours, sans les passages au stand) ; un arrêt fixé à la main
+   arrêt, essence et marge (l'**énergie virtuelle** restante et sa marge pour les voitures qui en
+   ont), écart avec le plan, et à l'arrêt le pilote qui prend le relais, le niveau et les pneus. Le recalcul repart de la course telle qu'elle est (temps restant, essence,
+   arrêts faits, temps déjà roulé dans le relais, énergie restante) avec le rythme, la consommation
+   et l'énergie par tour mesurés depuis le départ (médiane des 10 derniers tours, sans les passages
+   au stand) ; un arrêt fixé à la main
    que le réservoir ne permet plus d'atteindre avance. Le plan d'origine reste affiché à côté.
 4. **Plan de travail** : la séance en cours, virage par virage (votre écart au premier passage,
    puis au dernier), et votre meilleur tour face à la référence.
@@ -443,9 +451,18 @@ Overlay), qui se déplace par son bandeau et se redimensionne par son coin :
 
 ![Le pitwall](docs/images/18-pitwall.png)
 
-**En spectateur**, SimHub ne reçoit rien de LMU : TeamPace lit alors directement la mémoire partagée
-de LMU. Votre voiture est reconnue au nom du pilote au volant (un pilote de l'équipe). Tours,
-temps restant, arrêts, pilote au volant, pédales et vitesse sont lus en direct, de même que
+**D'où viennent les données** : de la mémoire partagée de LMU, telle que Studio 397 la documente
+dans son kit officiel (`Support\SharedMemoryInterface` dans le dossier du jeu), au volant comme en
+spectateur ; SimHub n'est utilisé que si elle est indisponible. TeamPace la copie d'un bloc sous le
+verrou de LMU, sans faire attendre le jeu. On y lit le type de session et le temps restant, et pour
+chaque voiture les tours et l'heure de départ de chacun, la position, l'équipe, les arrêts et
+l'état au stand (la voiture est-elle à l'arrêt dans son box). Pour la voiture conduite sur ce PC,
+LMU publie aussi l'essence, l'énergie virtuelle, l'usure de chaque pneu, les pédales du pilote et le
+signal de tour invalide.
+
+**En spectateur** (SimHub ne reçoit alors rien de LMU), votre voiture est reconnue à son équipe et
+à sa voiture telles que LMU les nomme, sinon au nom du pilote au volant (un pilote de l'équipe).
+Tours, temps restant, arrêts, pilote au volant, pédales et vitesse sont lus en direct, de même que
 toutes les voitures pour l'analyse. LMU ne publie pas l'essence d'une voiture qu'on regarde
 seulement : elle est **estimée** d'après le plan (plein à chaque arrêt, consommation prévue), et
 reste inconnue tant qu'on n'a pas vu le départ ou un arrêt. Rejoint en cours de course, les tours
@@ -515,5 +532,6 @@ $env:SIMHUB_INSTALL_PATH = "F:\Program Files (x86)\SimHub\"
 ```
 
 Le projet référence les DLL de SimHub via `SIMHUB_INSTALL_PATH` : elles ne sont pas incluses dans ce
-dépôt. Les données des pilotes (`PluginsData\Common\TeamPace\`) ne sont jamais publiées ici.
+dépôt. La lecture de LMU (`LmuMemory.cs`) suit le kit officiel livré avec le jeu
+(`Support\SharedMemoryInterface`), qui n'est pas redistribué ici. Les données des pilotes (`PluginsData\Common\TeamPace\`) ne sont jamais publiées ici.
 Les captures de cette page utilisent des données de démonstration anonymisées.
