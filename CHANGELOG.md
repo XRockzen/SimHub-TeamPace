@@ -3,6 +3,11 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.7.1
+
+- **Activité : les poignées de période sont bien là** sur l'écran Carrière, sous le graphique du
+  dernier pilote. Tous les pilotes suivent la période en direct, avec la même échelle.
+
 ## 4.7.0
 
 - **Les vraies données de LMU, plus de déductions.** TeamPace lit maintenant la mémoire partagée de

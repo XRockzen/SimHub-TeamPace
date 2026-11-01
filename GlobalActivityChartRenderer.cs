@@ -109,8 +109,11 @@ namespace User.TeamPace
         public bool      RangeHandles  { get; set; }
         public DateTime? ViewFrom      { get; set; }
         public DateTime? ViewTo        { get; set; }
+        public double?   PeriodScaleMax { get; set; }   // the scale shared by several charts over a narrowed period
         /// <summary>The period was changed with the handles (on release).</summary>
         public event Action RangeChanged;
+        /// <summary>The period changes while a handle is dragged.</summary>
+        public event Action RangeMoving;
 
         private const double SliderH = 18;
         private const int    MinWeeks = 4;
@@ -122,12 +125,15 @@ namespace User.TeamPace
         private int    _dragFirst, _dragLast;
 
         /// <summary>Highest weekly total for these laps, in the unit used by the chart.</summary>
-        public static double MaxWeeklyValue(List<ActivityLap> laps, bool useHours)
+        public static double MaxWeeklyValue(List<ActivityLap> laps, bool useHours, DateTime? from = null, DateTime? to = null)
         {
             var weeks = new Dictionary<DateTime, double>();
+            DateTime lo = from.HasValue ? WeekStart(from.Value) : DateTime.MinValue, hi = to.HasValue ? WeekStart(to.Value) : DateTime.MaxValue;
             foreach (var lap in laps)
             {
                 if (lap.Date == DateTime.MinValue) continue;
+                var w = WeekStart(lap.Date);
+                if (w < lo || w > hi) continue;
                 if (useHours && lap.LapTime <= TimeSpan.Zero) continue;
                 var ws = WeekStart(lap.Date);
                 double cur;
@@ -436,6 +442,8 @@ namespace User.TeamPace
             ViewFrom = f == 0 ? (DateTime?)null : _allWeeks[f];
             ViewTo   = l == total - 1 ? (DateTime?)null : _allWeeks[l];   // the last week: follows the weeks to come
             Render();
+            var h = RangeMoving;
+            if (h != null) h();
         }
 
         private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -622,7 +630,8 @@ namespace User.TeamPace
             // ── Period shown (the handles), within the whole timeline ─────────
             _allWeeks = allWeeks;
             int vFirst = 0, vLast = allWeeks.Count - 1;
-            if (RangeHandles && allWeeks.Count >= MinWeeks)
+            // A chart without handles follows the period given by another one
+            if ((RangeHandles || ViewFrom.HasValue || ViewTo.HasValue) && allWeeks.Count >= MinWeeks)
             {
                 if (ViewFrom.HasValue) vFirst = Math.Max(0, Math.Min(allWeeks.Count - 1, (int)((WeekStart(ViewFrom.Value) - minW).TotalDays / 7)));
                 if (ViewTo.HasValue)   vLast  = Math.Max(0, Math.Min(allWeeks.Count - 1, (int)((WeekStart(ViewTo.Value) - minW).TotalDays / 7)));
@@ -643,6 +652,7 @@ namespace User.TeamPace
                 if (total > maxVal) maxVal = total;
             }
             if (whole && ScaleMaxValue.HasValue && ScaleMaxValue.Value > maxVal) maxVal = ScaleMaxValue.Value;   // a narrowed period: its own scale
+            if (!whole && PeriodScaleMax.HasValue && PeriodScaleMax.Value > maxVal) maxVal = PeriodScaleMax.Value;
             if (maxVal <= 0 && RangeHandles && allWeeks.Count >= MinWeeks)
             {
                 // Nothing driven in the period: the empty chart and its handles all the same

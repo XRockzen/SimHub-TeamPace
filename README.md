@@ -163,10 +163,11 @@ Un **clic** sur une ligne fait ressortir ce circuit dans l'activité de chaque p
 semaine, une couleur par circuit) ; à l'inverse, un clic sur une barre de l'activité sélectionne sa
 ligne. Un **double-clic** ouvre la page du circuit ; pour changer de circuit, on revient à la Carrière.
 
-**Choisir la période de l'activité** : sous le graphique, deux poignées bornent la période
-affichée. Tirez celle de gauche vers la droite pour ne garder que les derniers mois, faites glisser
+**Choisir la période de l'activité** : sous le graphique du dernier pilote, deux poignées bornent
+la période affichée. Tirez celle de gauche vers la droite pour ne garder que les derniers mois, faites glisser
 la barre entre les deux pour décaler la période, double-cliquez sur la barre pour revoir tout
-l'historique. L'échelle s'adapte à la période, et la même période s'applique à tous les pilotes.
+l'historique. Tous les pilotes suivent la même période, avec une échelle commune qui s'adapte à
+elle.
 
 ![La période de l'activité](docs/images/19-activite-periode.png)
 

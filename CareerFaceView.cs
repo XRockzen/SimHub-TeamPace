@@ -371,7 +371,8 @@ namespace User.TeamPace
         {
             var panel = new StackPanel();
             var title = Ui.T("ACTIVITÉ  ·  heures par semaine", 11, Ui.Muted);
-            title.ToolTip = "Une couleur par circuit. Clic sur une barre : sélectionne le circuit dans le tableau.";
+            title.ToolTip = "Une couleur par circuit. Clic sur une barre : sélectionne le circuit dans le tableau. "
+                          + "Les poignées sous le graphique choisissent la période ; double-clic sur la barre : tout l'historique.";
             panel.Children.Add(title);
 
             DateTime? scaleMin = null;
@@ -400,11 +401,17 @@ namespace User.TeamPace
                 name.Width = 120;
                 DockPanel.SetDock(name, Dock.Left);
                 row.Children.Add(name);
-                var canvas = new Canvas { Height = _drivers.Count > 2 ? 54 : 70, Background = Brushes.Transparent, ClipToBounds = true };
+                bool last = i == _drivers.Count - 1;   // the period handles under the last chart, for every driver
+                var canvas = new Canvas { Height = (_drivers.Count > 2 ? 54 : 70) + (last ? 18 : 0), Background = Brushes.Transparent, ClipToBounds = true };
                 row.Children.Add(canvas);
                 panel.Children.Add(row);
 
-                var chart = new GlobalActivityChartRenderer { ScaleMinDate = scaleMin, ScaleMaxValue = scaleMax > 0 ? (double?)scaleMax : null };
+                var chart = new GlobalActivityChartRenderer
+                {
+                    ScaleMinDate = scaleMin, ScaleMaxValue = scaleMax > 0 ? (double?)scaleMax : null,
+                    RangeHandles = last, ViewFrom = _from, ViewTo = _to,
+                };
+                if (last) { chart.RangeChanged += () => ApplyPeriod(chart, acts); chart.RangeMoving += () => ApplyPeriod(chart, acts); }
                 chart.Attach(canvas, acts[i], tracks);
                 chart.SetMode(true);
                 chart.TrackClicked += track =>
@@ -416,8 +423,26 @@ namespace User.TeamPace
                     Select(match != null ? match.Key : null, true);
                 };
                 _charts.Add(chart);
+                if (i == _drivers.Count - 1) ApplyPeriod(chart, acts);
             }
             return Ui.Card(panel);
+        }
+
+        // The period of the activity, kept while the plugin runs
+        private static DateTime? _from, _to;
+
+        /// <summary>The period chosen with the handles, on every driver's chart, with a scale common to them.</summary>
+        private void ApplyPeriod(GlobalActivityChartRenderer source, List<List<ActivityLap>> acts)
+        {
+            _from = source.ViewFrom; _to = source.ViewTo;
+            double max = 0;
+            foreach (var a in acts) max = Math.Max(max, GlobalActivityChartRenderer.MaxWeeklyValue(a, true, _from, _to));
+            foreach (var c in _charts)
+            {
+                c.ViewFrom = _from; c.ViewTo = _to;
+                c.PeriodScaleMax = max > 0 ? (double?)max : null;
+                c.SetMode(c.UseHours);   // the dragged chart too: the common scale
+            }
         }
 
         // ─── Helpers ──────────────────────────────────────────────────────────
