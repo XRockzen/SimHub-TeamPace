@@ -33,6 +33,8 @@ namespace User.TeamPace
             {
                 if (!OverlayService.Live) OverlayService.DemoTick();
                 _preview.InvalidateVisual();
+                _heartPreview.InvalidateVisual();
+                UpdateHeartStatus();
             };
             Action status = () => Dispatcher.BeginInvoke(new Action(() => _status.Text = "Référence : " + OverlayService.Status));
             Loaded += (s, e) => { _timer.Start(); OverlayService.StatusChanged += status; status(); };
@@ -42,6 +44,7 @@ namespace User.TeamPace
                 OverlayService.StatusChanged -= status;
                 if (OverlayService.EditMode) OverlayService.SetEditMode(false);
                 if (OverlayService.PitEditMode) OverlayService.SetPitEditMode(false);
+                if (OverlayService.HeartEditMode) OverlayService.SetHeartEditMode(false);
             };
             Build();
         }
@@ -94,6 +97,7 @@ namespace User.TeamPace
             wrap.Children.Add(Section("Course", Race()));
             wrap.Children.Add(Section("Boutons du volant", Buttons()));
             wrap.Children.Add(Section("Pitwall : coéquipier spectateur", Pitwall()));
+            wrap.Children.Add(Section("Cardio : montre Da Fit", HeartSection()));
             _root.Children.Add(wrap);
             _building = false;
         }
@@ -314,6 +318,49 @@ namespace User.TeamPace
             p.Children.Add(ControlRow("P", "Pitwall.Afficher", "Masquer / afficher"));
             p.Children.Add(Note("Il suit le plan de stratégie choisi dans la section Course."));
             return p;
+        }
+
+        private readonly HeartView _heartPreview = new HeartView();
+        private readonly TextBlock _heartStatus = Ui.T("", 12.5, Ui.Muted);
+
+        /// <summary>The heart rate of the "Montre Da Fit" plugin: the small overlay and what is recorded.</summary>
+        private UIElement HeartSection()
+        {
+            var p = new StackPanel();
+            var top = new DockPanel();
+            var frame = new Border { Child = _heartPreview, Background = Ui.Frozen(Color.FromRgb(0x4A, 0x5A, 0x6C)), Padding = new Thickness(8), CornerRadius = new CornerRadius(8), VerticalAlignment = VerticalAlignment.Top };
+            DockPanel.SetDock(frame, Dock.Left);
+            top.Children.Add(frame);
+            var side = new StackPanel { Margin = new Thickness(12, 0, 0, 0) };
+            _heartStatus.TextWrapping = TextWrapping.Wrap;
+            side.Children.Add(_heartStatus);
+            side.Children.Add(Check("Afficher le petit cœur en roulant", S.HeartEnabled, v => { S.HeartEnabled = v; Changed(false); }));
+            var place = Ui.Button(OverlayService.HeartEditMode ? "Terminé" : "Placer le cœur à l'écran");
+            place.Margin = new Thickness(0, 8, 0, 0);
+            place.HorizontalAlignment = HorizontalAlignment.Left;
+            place.Click += (s, e) =>
+            {
+                OverlayService.SetHeartEditMode(!OverlayService.HeartEditMode);
+                place.Content = OverlayService.HeartEditMode ? "Terminé" : "Placer le cœur à l'écran";
+            };
+            side.Children.Add(place);
+            top.Children.Add(side);
+            p.Children.Add(top);
+            p.Children.Add(Note("Glissez-le dans un coin (en haut à droite par défaut), la molette change sa taille. Il apparaît dans le jeu quand le plugin Montre Da Fit est là."));
+            p.Children.Add(SliderRow("Taille", 50, 400, S.HeartScale * 100, v => string.Format("{0:0} %", v), v => { S.HeartScale = v / 100; Changed(false); }));
+            p.Children.Add(ControlRow("♥", "Cardio.Afficher", "Masquer / afficher"));
+            p.Children.Add(Check("Partager mon cardio avec l'équipe", S.ShareHeart, v => { S.ShareHeart = v; Changed(false); LmuTeamSync.ExportAsync(); }));
+            p.Children.Add(Note("En roulant, TeamPace enregistre avec chaque tour votre BPM moyen, mini et maxi, chaque secteur, le temps dans chaque zone et le BPM tous les 50 m : à voir dans l'analyse des sessions et la télémétrie. Rien n'est enregistré en spectateur."));
+            UpdateHeartStatus();
+            return p;
+        }
+
+        private void UpdateHeartStatus()
+        {
+            string text = !Heart.Present ? "Plugin Montre Da Fit absent ou désactivé : rien n'est enregistré."
+                        : Heart.Bpm > 0 ? string.Format("Montre connectée : {0} bpm (zone {1})", Heart.Bpm, Heart.Zone)
+                        : "Montre : " + (string.IsNullOrEmpty(Heart.State) ? "pas de mesure" : Heart.State) + ", en attente d'une mesure valide.";
+            if (_heartStatus.Text != text) _heartStatus.Text = text;
         }
 
         private static UIElement ControlRow(string key, string action, string label)

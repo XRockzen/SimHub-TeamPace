@@ -124,6 +124,22 @@ namespace User.TeamPace
             lock (_lock) File.Copy(_dbPath, destPath, true);
         }
 
+        /// <summary>Removes the heart rate recorded with the laps from a copy of the database (not shared).</summary>
+        public static void StripHeartRate(string dbPath)
+        {
+            using (var db = new LiteDatabase(string.Format("Filename={0}", dbPath)))
+            {
+                var col = db.GetCollection("live_laps");
+                foreach (var doc in col.FindAll().ToList())
+                {
+                    bool changed = false;
+                    foreach (var key in doc.Keys.ToList())
+                        if (key.StartsWith("Hr", StringComparison.Ordinal)) { doc.Remove(key); changed = true; }
+                    if (changed) col.Update(doc);
+                }
+            }
+        }
+
         /// <summary>Reads the player name stored in another plugin's database copy.</summary>
         public static string ReadPlayerName(string dbPath)
         {

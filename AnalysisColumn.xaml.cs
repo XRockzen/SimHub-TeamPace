@@ -182,6 +182,7 @@ namespace User.TeamPace
                 prevLap = l;
                 if (row.HasVe) hasVe = true;
                 if (row.HasTireData) hasTire = true;
+                if (row.HasHeart) HasHeart = true;
                 row.PropertyChanged += (s, ev) => { if (ev.PropertyName == "IsChecked") Recalc(); };
                 _rows.Add(row);
                 if (!string.IsNullOrEmpty(l.FrontCompound)) prevCompound = l.FrontCompound;
@@ -218,7 +219,8 @@ namespace User.TeamPace
             TxtDate.ToolTip = liveMatched > 0
                 ? string.Format(Inv, "Capture directe SimHub : {0} tour(s) (carburant, usure, arrêts)", liveMatched)
                 : "Pas de capture directe : SimHub n'était pas ouvert pendant la session";
-            SetOptionalBlocks(HasFuel, HasVe, HasTyres, HasPits);
+            SetOptionalBlocks(HasFuel, HasVe, HasTyres, HasPits, HasHeart);
+            UpdateHeart();
 
             Recalc();
         }
@@ -274,13 +276,50 @@ namespace User.TeamPace
         public bool HasVe    { get; private set; }
         public bool HasTyres { get; private set; }
         public bool HasPits  { get; private set; }
+        public bool HasHeart { get; private set; }
+
+        /// <summary>The session's heart rate: average, peak at the start, maximum, time in each zone.</summary>
+        private void UpdateHeart()
+        {
+            double avg; int max, start; double[] zones;
+            var laps = new List<LmuLiveLap>();
+            foreach (var row in _rows) if (row.Lap.Live != null) laps.Add(row.Lap.Live);
+            HeartZones.Children.Clear();
+            HeartZones.ColumnDefinitions.Clear();
+            if (!HeartData.Summary(laps, out avg, out max, out start, out zones))
+            {
+                // Another driver had a watch, this one not
+                TxtStHr.Text = "—";
+                TxtStHrLine.Text = "pas de cardio sur cette session";
+                StatsHeartPanel.ToolTip = null;
+                return;
+            }
+            TxtStHr.Text = string.Format(Inv, "{0:0} bpm", avg);
+            TxtStHrLine.Text = start > 0 ? string.Format(Inv, "départ {0} · maxi {1}", start, max) : string.Format(Inv, "maxi {0}", max);
+            double total = 0;
+            foreach (var z in zones) total += z;
+            var tip = new List<string> { "Temps dans chaque zone :" };
+            for (int z = 0; z < 6; z++)
+            {
+                if (zones[z] <= 0) continue;
+                HeartZones.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(zones[z], GridUnitType.Star) });
+                var cell = new Border { Background = new SolidColorBrush(Heart.ZoneColors[z]), Margin = new Thickness(0, 0, 1, 0) };
+                Grid.SetColumn(cell, HeartZones.ColumnDefinitions.Count - 1);
+                HeartZones.Children.Add(cell);
+                tip.Add(string.Format(Inv, "zone {0} ({1}) : {2} · {3:0} %", z, Heart.ZoneNames[z], Fmt.TotalTime(TimeSpan.FromSeconds(zones[z])), 100 * zones[z] / total));
+            }
+            StatsHeartPanel.ToolTip = string.Join("\n", tip);
+        }
 
         /// <summary>
         /// Shows the optional blocks and columns. In a comparison the host passes the union over
         /// all drivers, so every column keeps the same layout and the lap tables stay aligned.
         /// </summary>
-        public void SetOptionalBlocks(bool fuel, bool ve, bool tyres, bool pits)
+        public void SetOptionalBlocks(bool fuel, bool ve, bool tyres, bool pits, bool heart)
         {
+            StatsHeartPanel.Visibility = heart ? Visibility.Visible : Visibility.Collapsed;
+            ColHr.Visibility           = heart ? Visibility.Visible : Visibility.Collapsed;
+            ColHrMax.Visibility        = heart ? Visibility.Visible : Visibility.Collapsed;
             StatsConsoPanel.Visibility = fuel || ve ? Visibility.Visible : Visibility.Collapsed;
             // Without virtual energy, the fuel takes the big place
             FuelSide.Visibility = fuel && ve ? Visibility.Visible : Visibility.Collapsed;
@@ -755,6 +794,7 @@ namespace User.TeamPace
         private static void ApplyLive(LmuLapRecord l, LmuLiveLap s)
         {
             l.HasLive        = true;
+            l.Live           = s;
             l.LiveFuelUsedL  = (float)s.FuelUsedL;
             l.LiveFuelLevelL = (float)s.FuelLevelL;
             l.LiveWearFL     = (float)s.WearFL;

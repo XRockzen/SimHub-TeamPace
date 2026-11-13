@@ -3,6 +3,20 @@
 Chaque version est publiée dans les [releases](../../releases) et proposée automatiquement dans
 TeamPace par le bandeau de mise à jour.
 
+## 4.8.0
+
+- **Cardio avec la montre Da Fit.** Avec le plugin SimHub Montre Da Fit, TeamPace enregistre votre
+  fréquence cardiaque avec chaque tour quand vous roulez : moyenne, mini, maxi, chaque secteur,
+  temps dans chaque zone, BPM tous les 50 m, et le pic de la première minute de la session. Les
+  mesures invalides ou aberrantes sont écartées. Sans la montre, rien ne change.
+  - **Petit overlay** : un cœur qui bat à votre rythme et le BPM dessous, à placer dans un coin,
+    à masquer avec un bouton du volant.
+  - **Analyse d'une session** : colonnes ♥ moy et ♥ max, et un bloc Cardio (moyenne, départ,
+    maximum, temps par zone).
+  - **Télémétrie** : une courbe Cardio pour le tour choisi, et le tracé de la carte coloré du calme
+    au tendu.
+  - Partagé avec l'équipe par défaut, une case le garde sur votre PC.
+
 ## 4.7.1
 
 - **Activité : les poignées de période sont bien là** sur l'écran Carrière, sous le graphique du

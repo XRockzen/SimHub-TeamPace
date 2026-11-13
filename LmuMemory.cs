@@ -13,6 +13,7 @@ namespace User.TeamPace
     internal class LmuCar
     {
         public int Id, Place, Laps, Pitstops, Penalties, Gear, Control, PitState, FinishStatus, LapsBehindLeader;
+        public int Sector;   // 0 to 2 (sectors 1 to 3)
         public string Driver = "", Vehicle = "", Class = "", Team = "";
         public bool InPits, IsPlayer;
         public ulong SteamId;
@@ -221,6 +222,8 @@ namespace User.TeamPace
         private static void Score(LmuCar c, int o)
         {
             c.Laps = BitConverter.ToInt16(Veh, o + 100);
+            int sector = (sbyte)Veh[o + 102];   // LMU: 0 = sector 3, 1 = sector 1, 2 = sector 2
+            c.Sector = sector == 0 ? 2 : sector - 1;
             c.FinishStatus = (sbyte)Veh[o + 103];
             c.LapDist = F64(Veh, o + 104);
             c.BestLap = F64(Veh, o + 144);

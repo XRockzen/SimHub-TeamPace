@@ -73,6 +73,7 @@ namespace User.TeamPace
             this.AddAction("Overlay.Action", (a, b) => OverlayService.PageAction(), (a, b) => { });
             this.AddAction("Overlay.Afficher", (a, b) => OverlayService.ToggleVisible(), (a, b) => { });
             this.AddAction("Pitwall.Afficher", (a, b) => OverlayService.TogglePitwall(), (a, b) => { });
+            this.AddAction("Cardio.Afficher", (a, b) => OverlayService.ToggleHeart(), (a, b) => { });
             this.AttachDelegate("Overlay.Delta", () => OverlayService.Delta);
             this.AttachDelegate("Overlay.Page", () => OverlayService.CurrentPage < 0 ? "" : OverlaySettings.PageName((OverlayPage)OverlayService.CurrentPage));
 
@@ -104,6 +105,7 @@ namespace User.TeamPace
 
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
         {
+            Heart.Read(pluginManager);   // the "Montre Da Fit" plugin, when it is there
             if (data.GameName == "LMU")
             {
                 // LMU's own memory, read once for the whole frame

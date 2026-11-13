@@ -8,7 +8,7 @@ using System.Windows.Media;
 
 namespace User.TeamPace
 {
-    public enum TeleChannel { Delta, Speed, Throttle, Brake, Gear, Steer, Rpm }
+    public enum TeleChannel { Delta, Speed, Throttle, Brake, Gear, Steer, Rpm, Heart }
 
     /// <summary>
     /// Stacked telemetry panels sharing a lap-distance axis. Traces are drawn on one layer
@@ -22,11 +22,12 @@ namespace User.TeamPace
             public TeleTrace Data;
             public Color     Color;
             public float[]   Delta;   // time gap to the reference at each reference point (null = reference)
+            public float[]   Heart;   // heart rate at each point, BPM (null: no watch on that lap)
         }
 
         public static readonly TeleChannel[] Channels =
             { TeleChannel.Delta, TeleChannel.Speed, TeleChannel.Throttle, TeleChannel.Brake,
-              TeleChannel.Gear, TeleChannel.Steer, TeleChannel.Rpm };
+              TeleChannel.Gear, TeleChannel.Steer, TeleChannel.Rpm, TeleChannel.Heart };
 
         public static string Title(TeleChannel c)
         {
@@ -38,6 +39,7 @@ namespace User.TeamPace
                 case TeleChannel.Brake:    return "Frein (%)";
                 case TeleChannel.Gear:     return "Rapport";
                 case TeleChannel.Steer:    return "Volant (%)";
+                case TeleChannel.Heart:    return "Cardio (BPM)";
                 default:                   return "Régime (tr/min)";
             }
         }
@@ -153,6 +155,7 @@ namespace User.TeamPace
                 case TeleChannel.Brake:    return d.Brake[i];
                 case TeleChannel.Gear:     return d.Gear[i];
                 case TeleChannel.Steer:    return d.Steer[i];
+                case TeleChannel.Heart:    return t.Heart != null ? t.Heart[i] : double.NaN;
                 default:                   return d.Rpm[i];
             }
         }
@@ -193,6 +196,8 @@ namespace User.TeamPace
                     lo = 0; hi = Math.Max(2, max) + 0.5; return;
                 case TeleChannel.Speed:
                     lo = 0; hi = Math.Ceiling(max * 1.05 / 50) * 50; return;
+                case TeleChannel.Heart:
+                    lo = Math.Floor(min / 10) * 10 - 5; hi = Math.Ceiling(max / 10) * 10 + 5; return;
                 default:   // rpm
                     lo = Math.Floor(min / 1000) * 1000; hi = Math.Ceiling(max / 1000) * 1000;
                     if (hi <= lo) hi = lo + 1000;

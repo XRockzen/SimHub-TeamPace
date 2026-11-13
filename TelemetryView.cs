@@ -35,7 +35,11 @@ namespace User.TeamPace
             public Color      Color;
             public TeleTrace  Trace;
             public string     Note;
+            public float[]    Heart;   // BPM at each point of the trace, null without a watch
         }
+
+        private static bool _heatMap = true;   // the first lap with a heart rate coloured by it on the map
+        private bool _hasHeart;
 
         private class Item
         {
@@ -292,12 +296,22 @@ namespace User.TeamPace
                 cb.Unchecked += (s, e) => { Visible.Remove(channel); _chart.SetVisible(VisibleList()); };
                 _toggles.Children.Add(cb);
             }
+            // The heart rate on the map, in place of the lap's colour
+            var heat = new CheckBox
+            {
+                Content = "♥ sur la carte", IsChecked = _heatMap, FontSize = 12, Foreground = Brushes.White, Margin = new Thickness(0, 0, 14, 0),
+                VerticalAlignment = VerticalAlignment.Center, ToolTip = "Colore le premier tour avec cardio selon le BPM : vert calme, rouge tendu",
+            };
+            heat.Checked   += (s, e) => { _heatMap = true;  Reload(true); };
+            heat.Unchecked += (s, e) => { _heatMap = false; Reload(true); };
+            _toggles.Children.Add(heat);
         }
 
-        private static List<TeleChannel> VisibleList()
+        private List<TeleChannel> VisibleList()
         {
             var list = new List<TeleChannel>();
-            foreach (var c in TelemetryChart.Channels) if (Visible.Contains(c)) list.Add(c);
+            foreach (var c in TelemetryChart.Channels)
+                if (Visible.Contains(c) && (c != TeleChannel.Heart || _hasHeart)) list.Add(c);   // no empty heart lane
             return list;
         }
 
@@ -511,8 +525,13 @@ namespace User.TeamPace
                     SimHub.Logging.Current.Warn("[TeamPace] Trace load: " + ex.Message);
                     continue;
                 }
-                traces.Add(new TelemetryChart.Trace { Data = s.Trace, Color = s.Color });
+                // The heart rate recorded live on that lap, along the trace
+                s.Heart = null;
+                try { s.Heart = HeartData.AlongTrace(HeartData.ForLap(s.Lap), s.Trace); }
+                catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Heart rate on the trace: " + ex.Message); }
+                traces.Add(new TelemetryChart.Trace { Data = s.Trace, Color = s.Color, Heart = s.Heart });
             }
+            _hasHeart = traces.Exists(t => t.Heart != null);
 
             // Time gap to the first lap, at each of its points
             if (traces.Count > 0)
@@ -545,10 +564,20 @@ namespace User.TeamPace
 
             var lines = new List<TrackMap.Line>();
             double length = _model != null ? _model.Length : 0;
+            bool heated = false;
             foreach (var s in _slots)
             {
                 if (s.Trace == null) continue;
-                lines.Add(MapLine(s));
+                var line = MapLine(s);
+                if (_heatMap && !heated && s.Heart != null)
+                {
+                    // Coloured by the heart rate, between its own lowest and highest values
+                    line.Heat = s.Heart;
+                    line.HeatLo = double.MaxValue; line.HeatHi = double.MinValue;
+                    foreach (var v in s.Heart) if (!float.IsNaN(v)) { line.HeatLo = Math.Min(line.HeatLo, v); line.HeatHi = Math.Max(line.HeatHi, v); }
+                    heated = true;
+                }
+                lines.Add(line);
                 if (_model == null) length = Math.Max(length, s.Trace.DistAt(s.Trace.N - 1));
             }
             _map.SetData(_model, lines, length);
@@ -664,8 +693,11 @@ namespace User.TeamPace
             if (_readout.ColumnDefinitions.Count == 0)
             {
                 _readout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 220 });
-                foreach (var w in new[] { 82.0, 86, 64, 64, 64, 68, 82, 96 }) _readout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
+                foreach (var w in new[] { 82.0, 86, 64, 64, 64, 68, 82, 96, 70 }) _readout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
             }
+            // The heart rate column, only when a lap shown has one
+            _readout.ColumnDefinitions[9].Width = new GridLength(_hasHeart ? 70 : 0);
+            int cols = _hasHeart ? 9 : 8;
             var live = _slots.Where(x => x.Trace != null).ToList();
             _readout.Visibility = live.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             if (live.Count == 0) return;
@@ -674,12 +706,13 @@ namespace User.TeamPace
 
             _readout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var bg = new Border { Background = new SolidColorBrush(Color.FromArgb(13, 255, 255, 255)), CornerRadius = new CornerRadius(6) };
-            Grid.SetColumnSpan(bg, 9); Grid.SetRowSpan(bg, live.Count + 1);
+            Grid.SetColumnSpan(bg, cols + 1); Grid.SetRowSpan(bg, live.Count + 1);
             _readout.Children.Add(bg);
             AddCell(new TextBlock { Text = cursor ? string.Format(Inv, "À {0:0} m", dist) : "Sous la souris",
                                     FontSize = 12, Foreground = cursor ? Brushes.White : muted, FontWeight = cursor ? FontWeights.SemiBold : FontWeights.Normal }, 0, 0);
             for (int c = 0; c < ReadoutHeads.Length; c++)
                 AddCell(new TextBlock { Text = ReadoutHeads[c], FontSize = 11.5, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Right }, 0, c + 1);
+            if (_hasHeart) AddCell(new TextBlock { Text = "Cardio", FontSize = 11.5, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Right }, 0, 9);
 
             Slot refSlot = live[0];
             int row = 1;
@@ -700,8 +733,8 @@ namespace User.TeamPace
                 };
                 AddCell(name, row, 0);
 
-                var vals = new string[8];
-                for (int k = 0; k < 8; k++) vals[k] = "—";
+                var vals = new string[9];
+                for (int k = 0; k < 9; k++) vals[k] = "—";
                 Brush gapBrush = Brushes.White;
                 if (cursor && dist >= t.FirstDist && dist <= t.DistAt(t.N - 1))
                 {
@@ -723,14 +756,21 @@ namespace User.TeamPace
                     vals[5] = string.Format(Inv, "{0:+0;-0;0} %", t.Steer[i]);
                     vals[6] = string.Format(Inv, "{0:0}", t.Rpm[i]);
                     if (t.HasLateral) vals[7] = string.Format(Inv, "{0:0.0} m {1}", Math.Abs(t.Lateral[i]), t.Lateral[i] > 0 ? "dr." : "g.");
+                    if (s.Heart != null && !float.IsNaN(s.Heart[i])) vals[8] = string.Format(Inv, "♥ {0:0}", s.Heart[i]);
                 }
                 else if (!cursor)
                 {
                     float top = 0;
                     for (int i = 0; i < t.N; i++) top = Math.Max(top, t.Speed[i]);
                     vals[1] = string.Format(Inv, "max {0:0}", top);
+                    if (s.Heart != null)
+                    {
+                        float hmax = 0;
+                        foreach (var v in s.Heart) if (!float.IsNaN(v)) hmax = Math.Max(hmax, v);
+                        vals[8] = string.Format(Inv, "max {0:0}", hmax);
+                    }
                 }
-                for (int k = 0; k < 8; k++)
+                for (int k = 0; k < cols; k++)
                     AddCell(new TextBlock
                     {
                         Text = vals[k], FontSize = 15, FontWeight = FontWeights.SemiBold,

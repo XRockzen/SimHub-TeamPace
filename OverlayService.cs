@@ -716,8 +716,8 @@ namespace User.TeamPace
 
         // ─── Wheel buttons ────────────────────────────────────────────────────
 
-        private static bool _hidden, _pitHidden;
-        public static bool EditMode, PitEditMode;
+        private static bool _hidden, _pitHidden, _heartHidden;
+        public static bool EditMode, PitEditMode, HeartEditMode;
 
         public static void NextPage(int dir)
         {
@@ -761,9 +761,15 @@ namespace User.TeamPace
             Dispatch(Sync);
         }
 
+        public static void ToggleHeart()
+        {
+            _heartHidden = !_heartHidden;
+            Dispatch(Sync);
+        }
+
         // ─── Window ───────────────────────────────────────────────────────────
 
-        private static Window _window, _pitWindow;
+        private static Window _window, _pitWindow, _heartWindow;
         private static DispatcherTimer _watch;
 
         public static void Init(string dataDir)
@@ -792,6 +798,8 @@ namespace User.TeamPace
             {
                 Show(ref _window, () => new OverlayWindow(false), EditMode || (s.Enabled && !_hidden && Live && CurrentPage >= 0), EditMode, s);
                 Show(ref _pitWindow, () => new PitwallWindow(), PitEditMode || (s.PitwallEnabled && !_pitHidden && Live), PitEditMode, s);
+                // The heart: in the game, while the watch plugin is there
+                Show(ref _heartWindow, () => new OverlayWindow(false, true), HeartEditMode || (s.HeartEnabled && !_heartHidden && Heart.Present && Live), HeartEditMode, s);
             }
             catch (Exception ex) { SimHub.Logging.Current.Warn("[TeamPace] Overlay window: " + ex.Message); }
         }
@@ -821,13 +829,20 @@ namespace User.TeamPace
             Sync();
         }
 
+        public static void SetHeartEditMode(bool on)
+        {
+            HeartEditMode = on;
+            Sync();
+        }
+
         public static void Shutdown()
         {
             Dispatch(() =>
             {
                 if (_window != null) _window.Close();
                 if (_pitWindow != null) _pitWindow.Close();
-                _window = _pitWindow = null;
+                if (_heartWindow != null) _heartWindow.Close();
+                _window = _pitWindow = _heartWindow = null;
             });
         }
 

@@ -104,6 +104,45 @@ namespace User.TeamPace
             }
         }
 
+        // ── Heart rate (watch, recorded live) ─────────────────────────────────
+
+        private LmuLiveLap Hr { get { return Lap.Live != null && Lap.Live.HasHeart ? Lap.Live : null; } }
+        public bool   HasHeart { get { return Hr != null; } }
+        public string HeartAvg { get { return HasHeart ? Math.Round(Hr.HrAvg).ToString(CultureInfo.InvariantCulture) : "—"; } }
+        public string HeartMax { get { return HasHeart ? Hr.HrMax.ToString(CultureInfo.InvariantCulture) : "—"; } }
+
+        /// <summary>The lap's heart rate in detail, on hover.</summary>
+        public string HeartTip
+        {
+            get
+            {
+                var h = Hr;
+                if (h == null) return "Pas de cardio sur ce tour";
+                var inv = CultureInfo.InvariantCulture;
+                var lines = new System.Collections.Generic.List<string>
+                {
+                    string.Format(inv, "BPM moyen {0:0} · mini {1} · maxi {2}", h.HrAvg, h.HrMin, h.HrMax),
+                    string.Format(inv, "Mesuré sur {0:0} % du tour", h.HrValidPct),
+                };
+                if (h.HrSectorAvg != null && h.HrSectorMax != null && h.HrSectorAvg.Length == 3)
+                {
+                    var parts = new System.Collections.Generic.List<string>();
+                    for (int s = 0; s < 3; s++)
+                        parts.Add(h.HrSectorAvg[s] > 0 ? string.Format(inv, "S{0} {1:0} (maxi {2})", s + 1, h.HrSectorAvg[s], h.HrSectorMax[s]) : string.Format(inv, "S{0} —", s + 1));
+                    lines.Add(string.Join(" · ", parts));
+                }
+                if (h.HrZoneSec != null)
+                {
+                    var zones = new System.Collections.Generic.List<string>();
+                    for (int z = 5; z >= 0 && z < h.HrZoneSec.Length; z--)
+                        if (h.HrZoneSec[z] >= 1) zones.Add(string.Format(inv, "zone {0} ({1}) {2:0} s", z, Heart.ZoneNames[z], h.HrZoneSec[z]));
+                    if (zones.Count > 0) lines.Add(string.Join("\n", zones));
+                }
+                if (h.HrStartPeak > 0) lines.Add(string.Format(inv, "Pic au départ : {0} bpm", h.HrStartPeak));
+                return string.Join("\n", lines);
+            }
+        }
+
         // ── Compound ─────────────────────────────────────────────────────────
 
         public string Compound { get { return Lap.FrontCompound ?? ""; } }

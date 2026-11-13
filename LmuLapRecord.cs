@@ -51,6 +51,7 @@ namespace User.TeamPace
         public float  LiveWearRL         { get; set; }
         public float  LiveWearRR         { get; set; }
         public LmuLivePit LivePit        { get; set; }   // pit stop entered during this lap
+        public LmuLiveLap Live           { get; set; }   // what was recorded live (heart rate among it)
 
         // ─── Computed helpers ─────────────────────────────────────────────────
         public TimeSpan LapTime  { get { return TimeSpan.FromTicks(LapTimeTicks); } }

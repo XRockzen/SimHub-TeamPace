@@ -112,6 +112,7 @@ namespace User.TeamPace
                 // Write next to the target then swap, so the sync client never uploads a half file
                 var tmp = dest + ".tmp";
                 LmuSessionStore.CopyOwnDatabase(tmp);
+                if (!OverlaySettings.Current.ShareHeart) LmuSessionStore.StripHeartRate(tmp);   // kept on this PC only
                 if (!File.Exists(dest)) { File.Move(tmp, dest); return null; }
                 try { File.Replace(tmp, dest, null); }
                 catch (IOException)

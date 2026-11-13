@@ -62,6 +62,13 @@ namespace User.TeamPace
         public double PitW           { get; set; }   // window size, px
         public double PitH           { get; set; }
 
+        // Heart rate (the "Montre Da Fit" plugin): the small overlay, and sharing with the team
+        public bool   HeartEnabled   { get; set; }
+        public double HeartLeft      { get; set; }
+        public double HeartTop       { get; set; }
+        public double HeartScale     { get; set; }
+        public bool   ShareHeart     { get; set; }
+
         public static OverlaySettings Default()
         {
             return new OverlaySettings
@@ -71,6 +78,7 @@ namespace User.TeamPace
                 WindowSec = 8, Ghost = true,
                 Reference = "ideal", Voice = false, CoachCorners = 3, AnnounceMeters = 300,
                 PitwallEnabled = false, PitLeft = double.NaN, PitTop = 200, PitScale = 1, PitW = 1300, PitH = 900,
+                HeartEnabled = true, HeartLeft = double.NaN, HeartTop = 24, HeartScale = 1, ShareHeart = true,
             };
         }
 
@@ -80,6 +88,7 @@ namespace User.TeamPace
             if (SessionPages == null || SessionPages.Length != 12) SessionPages = DefaultSessionPages();
             if (!(Scale >= 0.4 && Scale <= 3)) Scale = 1;
             if (!(PitScale >= 0.4 && PitScale <= 3)) PitScale = 1;
+            if (!(HeartScale >= 0.5 && HeartScale <= 4)) { HeartScale = 1; HeartEnabled = true; ShareHeart = true; HeartLeft = double.NaN; HeartTop = 24; }   // a file from before the heart rate
             if (!(PitW >= 500)) PitW = 1300;
             if (!(PitH >= 300)) PitH = 900;
             if (!(Opacity >= 0 && Opacity <= 1)) Opacity = 0.88;

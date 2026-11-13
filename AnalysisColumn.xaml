@@ -188,6 +188,15 @@
                 </Grid>
             </DockPanel></Border>
 
+            <!-- Heart rate over the session (watch), with the time spent in each zone -->
+            <Border x:Name="StatsHeartPanel" Style="{StaticResource AnaBlock}" Visibility="Collapsed"><StackPanel>
+                <TextBlock Style="{StaticResource BlockTitle}" Text="CARDIO"
+                           ToolTip="Fréquence cardiaque de la montre (plugin Montre Da Fit), enregistrée en roulant"/>
+                <TextBlock x:Name="TxtStHr" Style="{StaticResource BlockBig}"/>
+                <Grid x:Name="HeartZones" Height="8" Margin="0,5,0,3"/>
+                <TextBlock x:Name="TxtStHrLine" Style="{StaticResource BlockLine}"/>
+            </StackPanel></Border>
+
             <!-- Stops along the session: one mark per stop, as wide as the time it cost -->
             <Border x:Name="StatsPitPanel" Style="{StaticResource AnaBlock}" Width="436"><DockPanel>
                 <DockPanel DockPanel.Dock="Top">
@@ -294,6 +303,16 @@
                 <DataGridTextColumn x:Name="ColFuelLeft" Header="Carbu" Binding="{Binding FuelRemaining}" Width="54" IsReadOnly="True"/>
                 <DataGridTextColumn x:Name="ColVe" Header="VE" Binding="{Binding VeUsed}" Width="52" IsReadOnly="True" Visibility="Collapsed"/>
                 <DataGridTextColumn x:Name="ColWear" Header="Usure" Binding="{Binding TireWearAvg}" Width="60" IsReadOnly="True"/>
+                <DataGridTemplateColumn x:Name="ColHr" Header="♥ moy" Width="50" Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate><TextBlock Text="{Binding HeartAvg}" ToolTip="{Binding HeartTip}"/></DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn x:Name="ColHrMax" Header="♥ max" Width="50" Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate><TextBlock Text="{Binding HeartMax}" ToolTip="{Binding HeartTip}"/></DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

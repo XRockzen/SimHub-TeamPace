@@ -475,6 +475,39 @@ référence se calcule à partir de la télémétrie de l'équipe : il faut des 
 sur ce circuit (« ⟳ Tout mettre à jour »). Pendant que vous roulez, l'overlay ne lit rien sur
 le disque et ne crée rien à chaque image : il reste léger.
 
+### Cardio (montre Da Fit)
+
+Avec le plugin SimHub **Montre Da Fit** (fréquence cardiaque d'une montre en Bluetooth), TeamPace
+enregistre votre cardio avec chaque tour, quand vous roulez (rien en spectateur). Sans ce plugin,
+ou montre éteinte, TeamPace fonctionne exactement comme avant.
+
+- **Le petit cœur** : un overlay discret, un cœur qui bat à votre rythme et le BPM dessous, sur
+  un fond sombre pour rester lisible. Il se place dans un coin (en haut à droite par défaut) avec
+  **Placer le cœur à l'écran**, se masque et s'affiche avec un bouton du volant (action
+  `TeamPacePlugin.Cardio.Afficher`). Gris avec « — » tant que la montre n'a pas de mesure valide.
+
+  ![Le petit cœur](docs/images/20-cardio-overlay.png)
+
+- **Par tour** : BPM moyen (pondéré par le temps, sur les seules mesures valides), mini, maxi, part
+  du tour mesurée, chaque secteur, le temps dans chaque zone, et le BPM **tous les 50 m**. Les
+  mesures aberrantes (capteur secoué par le volant) sont écartées, jamais comptées comme 0.
+- **Analyse d'une session** : colonnes ♥ moy et ♥ max dans le tableau des tours (le détail au
+  survol), et un bloc **Cardio** : moyenne de la session, pic au départ (première minute après le
+  drapeau vert, ou après la sortie des stands), maximum et temps dans chaque zone. Un coéquipier
+  sans montre n'a simplement pas de chiffres.
+
+  ![Le cardio dans l'analyse](docs/images/22-cardio-analyse.png)
+
+- **Télémétrie** : une courbe **Cardio** sous les autres pour le tour choisi, et la case
+  **♥ sur la carte** colore le tracé du vert (calme) au rouge (tendu) pour voir où vous montez.
+
+  ![La courbe cardio](docs/images/21-cardio-telemetrie.png)
+
+  ![Le cardio sur la carte](docs/images/23-cardio-carte.png)
+
+Le cardio est **partagé avec l'équipe** comme le reste de vos données ; la case *Partager mon
+cardio avec l'équipe* (onglet Overlay, section Cardio) le garde sur votre PC.
+
 ## 7. Notifications
 
 ![Nouveautés de l'équipe](docs/images/14-notifications.png)

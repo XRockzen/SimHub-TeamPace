@@ -21,6 +21,8 @@ namespace User.TeamPace
             public double[]  X, Y;        // position of each trace point
             public List<int> BrakeIdx;    // braking starts
             public List<int> GasIdx;      // throttle back on
+            public float[]   Heat;        // heart rate at each point: the line coloured by it (null: its colour)
+            public double    HeatLo, HeatHi;
         }
 
         public event Action<double> DistanceClicked;            // corner close-up
@@ -122,7 +124,8 @@ namespace User.TeamPace
                 var l = _lines[li];
                 int a = l.Trace.IndexAt(lo), b = l.Trace.IndexAt(hi);
                 if (b - a < 2) continue;
-                dc.DrawGeometry(null, FrozenPen(l.Color, width), LineGeometry(l, a, b));
+                if (l.Heat != null) DrawHeat(dc, l, a, b, width * 1.8);
+                else dc.DrawGeometry(null, FrozenPen(l.Color, width), LineGeometry(l, a, b));
             }
 
             // Braking and throttle points
@@ -163,6 +166,7 @@ namespace User.TeamPace
                 }
 
             if (ShowLegend) DrawLegend(dc);
+            foreach (var l in _lines) if (l.Heat != null) { DrawHeatLegend(dc, l); break; }
             if (Zoomed) DrawScale(dc);
         }
 
@@ -218,6 +222,37 @@ namespace User.TeamPace
             dc.DrawEllipse(Brushes.Transparent, FrozenPen(GasRing, 2), new Point(x + 4, y), 4, 4);
             x += 12;
             Text(dc, "remise des gaz", new Point(x, y), TextBrush, size, false);
+        }
+
+        /// <summary>The line in pieces of the same colour, calm (green) to tense (red).</summary>
+        private void DrawHeat(DrawingContext dc, Line l, int a, int b, double width)
+        {
+            const int Buckets = 16;
+            int stride = Zoomed ? 1 : 2;
+            int start = a, bucket = -1;
+            for (int i = a; i <= b; i += stride)
+            {
+                float v = l.Heat[i];
+                int k = float.IsNaN(v) ? -1 : (int)Math.Round((Buckets - 1) * Math.Max(0, Math.Min(1, (v - l.HeatLo) / Math.Max(1, l.HeatHi - l.HeatLo))));
+                if (k != bucket || i + stride > b)
+                {
+                    int end = Math.Min(b, i);
+                    if (end > start)
+                    {
+                        if (bucket >= 0) dc.DrawGeometry(null, FrozenPen(Heart.Heat(bucket, 0, Buckets - 1), width), LineGeometry(l, start, end));
+                        else dc.DrawGeometry(null, FrozenPen(Color.FromArgb(120, 160, 160, 160), width * 0.6), LineGeometry(l, start, end));
+                    }
+                    start = end; bucket = k;
+                }
+            }
+        }
+
+        private void DrawHeatLegend(DrawingContext dc, Line l)
+        {
+            double size = IsLarge ? 12 : 10.5, x = 8, y = ActualHeight - (Zoomed ? 34 : 14), w = 90;
+            for (int i = 0; i < 18; i++)
+                dc.DrawRectangle(Frozen(Heart.Heat(i, 0, 17)), null, new Rect(x + w * i / 18, y - 3, w / 18 + 0.5, 6));
+            Text(dc, string.Format(CultureInfo.InvariantCulture, "♥ {0:0} → {1:0} bpm", l.HeatLo, l.HeatHi), new Point(x + w + 8, y), TextBrush, size, false);
         }
 
         private void DrawScale(DrawingContext dc)

@@ -757,12 +757,12 @@ namespace User.TeamPace
                 }
             }
 
-            bool fuel = false, ve = false, tyres = false, pits = false;
+            bool fuel = false, ve = false, tyres = false, pits = false, heart = false;
             foreach (var c in _analysisCols)
             {
-                fuel |= c.HasFuel; ve |= c.HasVe; tyres |= c.HasTyres; pits |= c.HasPits;
+                fuel |= c.HasFuel; ve |= c.HasVe; tyres |= c.HasTyres; pits |= c.HasPits; heart |= c.HasHeart;
             }
-            foreach (var c in _analysisCols) c.SetOptionalBlocks(fuel, ve, tyres, pits);
+            foreach (var c in _analysisCols) c.SetOptionalBlocks(fuel, ve, tyres, pits, heart);
             int maxStops = 0;
             foreach (var c in _analysisCols) maxStops = Math.Max(maxStops, c.PitCount);
             foreach (var c in _analysisCols) c.SetPitBlockStops(maxStops);

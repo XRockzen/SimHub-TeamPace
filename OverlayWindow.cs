@@ -16,15 +16,19 @@ namespace User.TeamPace
     internal class OverlayWindow : Window, IOverlayHost
     {
         private readonly OverlayCanvas _view;
-        private readonly bool _pit;
+        private readonly bool _pit, _heart;
         private readonly ScaleTransform _scale = new ScaleTransform(1, 1);
         private readonly DispatcherTimer _frame;
         private bool _edit, _clickThrough;
 
-        public OverlayWindow(bool pitwall)
+        public OverlayWindow(bool pitwall) : this(pitwall, false) { }
+
+        /// <summary>The overlay, the pitwall's band or the small heart-rate window.</summary>
+        public OverlayWindow(bool pitwall, bool heart)
         {
-            _pit = pitwall;
-            _view = pitwall ? (OverlayCanvas)new PitwallView() : new OverlayView();
+            _pit = pitwall && !heart;
+            _heart = heart;
+            _view = heart ? new HeartView() : _pit ? (OverlayCanvas)new PitwallView() : new OverlayView();
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
@@ -33,7 +37,7 @@ namespace User.TeamPace
             ShowActivated = false;
             ResizeMode = ResizeMode.NoResize;
             SizeToContent = SizeToContent.WidthAndHeight;
-            Title = pitwall ? "TeamPace pitwall" : "TeamPace overlay";
+            Title = heart ? "TeamPace cardio" : _pit ? "TeamPace pitwall" : "TeamPace overlay";
             _view.LayoutTransform = _scale;
             Content = _view;
 
@@ -44,7 +48,8 @@ namespace User.TeamPace
                 if (!_edit) return;
                 var st = OverlaySettings.Current;
                 double step = e.Delta > 0 ? 0.05 : -0.05;
-                if (_pit) st.PitScale = Math.Max(0.4, Math.Min(3, st.PitScale + step));
+                if (_heart) st.HeartScale = Math.Max(0.5, Math.Min(4, st.HeartScale + step));
+                else if (_pit) st.PitScale = Math.Max(0.4, Math.Min(3, st.PitScale + step));
                 else st.Scale = Math.Max(0.4, Math.Min(3, st.Scale + step));
                 OverlaySettings.Save();
             };
@@ -63,11 +68,13 @@ namespace User.TeamPace
         {
             _edit = edit;
             _view.EditMode = edit;
-            double scale = _pit ? s.PitScale : s.Scale;
+            double scale = _heart ? s.HeartScale : _pit ? s.PitScale : s.Scale;
             _scale.ScaleX = _scale.ScaleY = scale;
+            // The heart: top right corner by default
+            if (_heart && double.IsNaN(s.HeartLeft)) s.HeartLeft = SystemParameters.PrimaryScreenWidth - HeartView.W * scale - 24;
             if (_pit && double.IsNaN(s.PitLeft)) s.PitLeft = (SystemParameters.PrimaryScreenWidth - OverlaySettings.PitWidth * scale) / 2;
             if (!_pit && double.IsNaN(s.Left)) s.Left = (SystemParameters.PrimaryScreenWidth - OverlaySettings.BaseWidth * scale) / 2;
-            double left = _pit ? s.PitLeft : s.Left, top = _pit ? s.PitTop : s.Top;
+            double left = _heart ? s.HeartLeft : _pit ? s.PitLeft : s.Left, top = _heart ? s.HeartTop : _pit ? s.PitTop : s.Top;
             if (Math.Abs(Left - left) > 0.5) Left = left;
             if (Math.Abs(Top - top) > 0.5) Top = top;
             Cursor = edit ? Cursors.SizeAll : null;
@@ -78,7 +85,8 @@ namespace User.TeamPace
         private void Save()
         {
             var s = OverlaySettings.Current;
-            if (_pit) { s.PitLeft = Left; s.PitTop = Top; }
+            if (_heart) { s.HeartLeft = Left; s.HeartTop = Top; }
+            else if (_pit) { s.PitLeft = Left; s.PitTop = Top; }
             else { s.Left = Left; s.Top = Top; }
             OverlaySettings.Save();
         }

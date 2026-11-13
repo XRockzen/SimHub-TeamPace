@@ -18,6 +18,19 @@ namespace User.TeamPace
         public double WearRL         { get; set; }
         public double WearRR         { get; set; }
         public bool   InPitLane      { get; set; }
+
+        // Heart rate ("Montre Da Fit" plugin), time-weighted on the valid measures; absent in older records
+        public double   HrAvg        { get; set; }   // BPM, 0 = no heart rate this lap
+        public int      HrMin        { get; set; }
+        public int      HrMax        { get; set; }
+        public double   HrValidPct   { get; set; }   // share of the lap with a valid measure, %
+        public double[] HrZoneSec    { get; set; }   // seconds in zones 0 to 5
+        public double[] HrSectorAvg  { get; set; }   // sectors 1 to 3, 0 = not measured
+        public int[]    HrSectorMax  { get; set; }
+        public byte[]   HrProfile    { get; set; }   // BPM every 50 m from the line, 0 = not measured
+        public int      HrStartPeak  { get; set; }   // peak of the first minute of the session (green flag, or leaving the pits)
+
+        [LiteDB.BsonIgnore] public bool HasHeart { get { return HrAvg > 0; } }
     }
 
     public class LmuLivePit
@@ -71,6 +84,12 @@ namespace User.TeamPace
         private bool[]   _pitTyres = new bool[4];
         private bool     _pitFromGarage;
 
+        // Heart rate of the lap under way, and the peak of the session's first minute
+        private readonly HeartLap _heart = new HeartLap();
+        private bool     _started;
+        private DateTime _startUntil;
+        private int      _startPeak, _lastPhase;
+
         public void Update(GameData data)
         {
             var now = DateTime.UtcNow;
@@ -80,7 +99,12 @@ namespace User.TeamPace
             {
                 // LMU's own values: fuel, wear (0..1, here in %), pit state and limiter
                 for (int i = 0; i < 4; i++) tyre[i] = us.Wear[i] * 100;
-                Tick(now, LmuLive.State.Track, us.Laps, us.Fuel, tyre, us.Speed, us.InPits, us.Limiter, us.PitState == LmuCar.PitStopped);
+                // The race starts at the green flag
+                int phase = LmuLive.State.Phase;
+                if (LmuLive.State.IsRace && phase == 5 && _lastPhase > 0 && _lastPhase < 5) StartWindow(now);
+                _lastPhase = phase;
+                Tick(now, LmuLive.State.Track, us.Laps, us.Fuel, tyre, us.Speed, us.InPits, us.Limiter, us.PitState == LmuCar.PitStopped,
+                     us.LapDist, us.Sector);
                 return;
             }
             var d = data.NewData;
@@ -90,10 +114,12 @@ namespace User.TeamPace
                 return;
             }
             tyre[0] = d.TyreWearFrontLeft; tyre[1] = d.TyreWearFrontRight; tyre[2] = d.TyreWearRearLeft; tyre[3] = d.TyreWearRearRight;
-            Tick(now, d.TrackName ?? "", d.CompletedLaps, d.Fuel, tyre, d.SpeedKmh, d.IsInPitLane != 0, d.PitLimiterOn != 0, d.SpeedKmh < StoppedKmh);
+            Tick(now, d.TrackName ?? "", d.CompletedLaps, d.Fuel, tyre, d.SpeedKmh, d.IsInPitLane != 0, d.PitLimiterOn != 0, d.SpeedKmh < StoppedKmh,
+                 d.TrackPositionMeters, Math.Max(-1, Math.Min(2, d.CurrentSectorIndex - 1)));
         }
 
-        private void Tick(DateTime now, string track, int completed, double fuel, double[] tyre, double speed, bool inLane, bool limiter, bool stopped)
+        private void Tick(DateTime now, string track, int completed, double fuel, double[] tyre, double speed, bool inLane, bool limiter, bool stopped,
+                          double dist, int sector)
         {
             double dt = _lastTick == DateTime.MinValue ? 0 : (now - _lastTick).TotalSeconds;
             if (dt < 0 || dt > MaxTickSec) dt = 0;
@@ -101,6 +127,12 @@ namespace User.TeamPace
 
             if (track != _track || completed < _lastCompleted)
                 ResetSession(track);
+
+            // Heart rate: the session's first minute (once the car moves, or from the green flag), and the lap
+            int bpm = Heart.Bpm;
+            if (!_started && speed > 10) StartWindow(now);
+            if (now < _startUntil && bpm > _startPeak) _startPeak = bpm;
+            _heart.Add(dt, bpm, Heart.Zone, dist, sector);
 
             AccumulateFuel(fuel, _inLane);
             AccumulateWear(tyre, _inLane && stopped);
@@ -125,6 +157,17 @@ namespace User.TeamPace
             _inLane        = false;
             _prevFuel      = -1;
             _prevTyre      = null;
+            _started       = false;
+            _startPeak     = 0;
+            _startUntil    = DateTime.MinValue;
+            _heart.Reset();
+        }
+
+        private void StartWindow(DateTime now)
+        {
+            _started = true;
+            _startPeak = 0;
+            _startUntil = now.AddSeconds(60);
         }
 
         private void StartLap(DateTime now)
@@ -134,6 +177,7 @@ namespace User.TeamPace
             _fuelUsed   = 0;
             _wear       = new double[4];
             _lapInPit   = _inLane;
+            _heart.Reset();
         }
 
         private void AccumulateFuel(double fuel, bool inLane)
@@ -224,6 +268,9 @@ namespace User.TeamPace
                 WearRR        = _wear[3],
                 InPitLane     = _lapInPit,
             };
+            _heart.Fill(lap);
+            // The start's peak goes with the lap during which its minute ended
+            if (_startPeak > 0 && now >= _startUntil && lap.HasHeart) { lap.HrStartPeak = _startPeak; _startPeak = 0; }
             Task.Run(() => LmuSessionStore.SaveLiveLap(lap));
         }
     }
